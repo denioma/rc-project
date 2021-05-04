@@ -1,3 +1,4 @@
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -9,6 +10,24 @@
 #define BUFFSIZE 512
 
 int sock;
+
+void term() {
+    if (close(sock))
+        perror("Failed to close client socket");
+    printf(">> Connection closed\n");
+    exit(0);
+}
+
+int is_fin(char *buff) {
+    return ((strcmp(buff, "FIN") != 0) ? 0 : 1);
+}
+
+int recieve(int sock, char *buff, size_t size) {
+    int nread = read(sock, buff, size);
+    if (nread > 0) buff[nread] = 0;
+    if (is_fin(buff)) term();
+    return nread;
+}
 
 int main(int argc, char* argv[]) {
     if (argc != 3) {
@@ -33,7 +52,7 @@ int main(int argc, char* argv[]) {
     addr.sin_port = htons(port);
     socklen_t slen = sizeof(addr);
 
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+    if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
         fprintf(stderr, "Failed to open socket\n");
         exit(-1);
     }
@@ -44,10 +63,14 @@ int main(int argc, char* argv[]) {
     }
 
     char buff[BUFFSIZE];
-    int recv_len = recvfrom(sock, buff, sizeof(buff), 0, &addr, slen);
-    if (recv_len > 0) {
-        buff[recv_len] = 0;
-        printf("Received >> %s\n", buff);
+    int nread;
+    while ((nread = recieve(sock, buff, sizeof(buff))) > 0) {
+        if (nread > 0) {
+            if (is_fin(buff)) break;
+            printf("Received >> %s (%d bytes)\n", buff, nread);
+            write(sock, "ACK", 4);
+        } else break;
+        memset(buff, 0, sizeof(buff));
     }
 
     close(sock);

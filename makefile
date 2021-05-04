@@ -1,10 +1,16 @@
 CC = gcc
 FLAGS = -Wall -Wextra
 
-all: client server
+all: client.app server.app admin.app
 
-client: src/client.c
+client.app: src/client.c
 	${CC} ${FLAGS} $< -o $@
 
-server: src/server.c
+server.app: src/server.c src/configcli.c
+	${CC} ${FLAGS} $^ -o $@
+
+admin.app: src/admin.c
 	${CC} ${FLAGS} $< -o $@
+
+clean:
+	@rm -f server.app client.app admin.app
