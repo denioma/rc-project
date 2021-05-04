@@ -8,8 +8,23 @@
 
 #define BUFFSIZE 512
 
+char prefix[64] = "[Config CLI]";
 extern int tcp_sock;
 int client_fd;
+
+/*
+// TODO: Thinking about adding a process collector as a thread, seems a good idea
+pthread_t cli_collector;
+void* collector() {
+    char buffer[BUFFSIZE];
+    while (1) {
+        sleep(60);
+        pid_t collecting;
+        while((collecting = waitpid(0, NULL, WNOHANG)) > 0)
+            printf("[CLI collector] Collected worker %u\n", collecting);
+    }
+}
+*/
 
 int is_ack(char* buff) {
     return ((strcmp(buff, "ACK") != 0) ? 0 : 1);
@@ -19,36 +34,17 @@ void cli_print(char* msg, char* prefix) {
     if (!prefix) printf("[Config CLI] %s\n", msg);
     else printf("%s %s\n", prefix, msg);
 }
+void sndmsg(char* msg) {
+    write(client_fd, msg, strlen(msg)+1);
+    cli_print(msg, prefix);
+}
 
 void cli_term() {
     write(client_fd, "FIN", 4);
     if (close(client_fd) != 0)
-        cli_print("Failed to close client socket (TCP)", NULL);
-    else cli_print("Closed client socket (TCP)", NULL);
+        cli_print("Failed to close client socket (TCP)", prefix);
+    else cli_print("Closed client socket (TCP)", prefix);
     exit(0);
-}
-
-void serve_cli() {
-    // Define SIGINT action
-    struct sigaction new;
-    new.sa_handler = cli_term;
-    sigemptyset(&new.sa_mask);
-    new.sa_flags = 0;
-    sigaction(SIGINT, &new, NULL);
-
-    char* prefix = "[CLI worker]";
-    pid_t mypid = getpid();
-    pid_t parent = getppid();
-    printf("%s PID: %u | PPID: %u\n", prefix, mypid, parent);
-    
-    char buff[BUFFSIZE];
-    int nread;
-    cli_print("Received TCP connection", prefix);
-    write(client_fd, "Not yet implemented!", 21);
-    nread = read(client_fd, buff, sizeof(buff));
-    if (nread > 0) buff[nread] = 0;
-    if (is_ack(buff)) cli_print("ACK received", prefix);
-    cli_term();
 }
 
 void term(int signum) {
@@ -60,6 +56,39 @@ void term(int signum) {
         while ((collected = wait(NULL)) != -1)
             printf("[Config CLI] collected pid %u\n", collected);
         exit(0);
+    }
+}
+
+
+void menu(char *opt) {
+    char buff[BUFFSIZE];
+    if (strcmp(opt, "LIST") == 0) sndmsg("Not yet implemented!");
+    else if (strncmp(opt, "ADD", 3) == 0) sndmsg("Not yet implemented!");
+    else if (strncmp(opt, "DEL", 3) == 0) sndmsg("Not yet implemented!");
+    else if (strcmp(opt, "QUIT") == 0) cli_term();
+    else {
+        snprintf(buff, sizeof(buff), "%s: command not found", opt);
+        sndmsg(buff);
+    }
+}
+
+void serve_cli() {
+    // Define SIGINT action
+    struct sigaction new;
+    new.sa_handler = cli_term;
+    sigemptyset(&new.sa_mask);
+    new.sa_flags = 0;
+    sigaction(SIGINT, &new, NULL);
+
+    snprintf(prefix, sizeof(prefix), "[CLI worker %u]", getpid());
+    
+    char buff[BUFFSIZE];
+    int nread;
+    cli_print("Received TCP connection", prefix);
+    while(1) {
+        nread = read(client_fd, buff, sizeof(buff));
+        if (nread > 0) menu(buff);
+        else break;
     }
 }
 

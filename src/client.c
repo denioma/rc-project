@@ -44,10 +44,10 @@ int main(int argc, char* argv[]) {
     }
 
     char buff[BUFFSIZE];
-    int recv_len = recvfrom(sock, buff, sizeof(buff), 0, &addr, slen);
+    int recv_len = recvfrom(sock, buff, sizeof(buff), 0, (struct sockaddr*)&addr, &slen);
     if (recv_len > 0) {
         buff[recv_len] = 0;
-        printf("Received >> %s\n", buff);
+        printf("%s\n", buff);
     }
 
     close(sock);

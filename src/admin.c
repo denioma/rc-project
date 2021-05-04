@@ -14,7 +14,7 @@ int sock;
 void term() {
     if (close(sock))
         perror("Failed to close client socket");
-    printf(">> Connection closed\n");
+    puts("Connection closed");
     exit(0);
 }
 
@@ -58,12 +58,11 @@ int main(int argc, char* argv[]) {
     }
   
     if (connect(sock, (struct sockaddr*)&addr, slen) < 0) {
-        fprintf(stderr, "Failed to connect to server\n");
+        perror("Failed to connect to server");
         exit(-1);
     }
 
-    char buff[BUFFSIZE];
-    int nread;
+/*
     while ((nread = recieve(sock, buff, sizeof(buff))) > 0) {
         if (nread > 0) {
             if (is_fin(buff)) break;
@@ -72,6 +71,21 @@ int main(int argc, char* argv[]) {
         } else break;
         memset(buff, 0, sizeof(buff));
     }
+*/
+
+    char buff[BUFFSIZE];
+    int nread;
+    do {
+        memset(buff, 0, sizeof(buff));
+        printf(">> ");
+        fgets(buff, sizeof(buff) - 1, stdin);
+        buff[strcspn(buff, "\n")] = 0;
+        write(sock, buff, strlen(buff) + 1);
+        memset(buff, 0, sizeof(buff));
+        nread = recieve(sock, buff, sizeof(buff));
+        if (nread > 0)
+            printf("%s\n\n", buff);
+    } while(strcmp(buff, "QUIT") != 0 && nread > 0);
 
     close(sock);
 
