@@ -11,7 +11,11 @@
 
 int sock;
 
-void term() {
+void term(int signum) {
+    if (signum == SIGINT) {
+        write(sock, "QUIT", 5);
+        puts("");
+    }
     if (close(sock))
         perror("Failed to close client socket");
     puts("Connection closed");
@@ -25,7 +29,7 @@ int is_fin(char *buff) {
 int recieve(int sock, char *buff, size_t size) {
     int nread = read(sock, buff, size);
     if (nread > 0) buff[nread] = 0;
-    if (is_fin(buff)) term();
+    if (is_fin(buff)) term(-1);
     return nread;
 }
 
@@ -34,6 +38,15 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Usage: ./server.app <host> <port>\n");
         exit(1);
     }
+
+    struct sigaction sigint;
+    sigset_t blocking;
+    sigemptyset(&blocking);
+    sigaddset(&blocking, SIGINT);
+    sigint.sa_handler = term;
+    sigemptyset(&sigint.sa_mask);
+    sigint.sa_flags = 0;
+    sigaction(SIGINT, &sigint, NULL);
 
     const char *hostname = *(argv+1);
     const short int port = atoi(*(argv+2));
@@ -81,10 +94,12 @@ int main(int argc, char* argv[]) {
         fgets(buff, sizeof(buff) - 1, stdin);
         buff[strcspn(buff, "\n")] = 0;
         write(sock, buff, strlen(buff) + 1);
+        sigprocmask(SIG_BLOCK, &blocking, NULL);
         memset(buff, 0, sizeof(buff));
         nread = recieve(sock, buff, sizeof(buff));
         if (nread > 0)
             printf("%s\n\n", buff);
+        sigprocmask(SIG_UNBLOCK, &blocking, NULL);
     } while(strcmp(buff, "QUIT") != 0 && nread > 0);
 
     close(sock);

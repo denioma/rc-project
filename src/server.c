@@ -8,11 +8,6 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
-#define PREFIX "[Server]"
-#define BUFFLEN 512
-#define PORT_TCP 8080
-#define PORT_UDP 8081
-
 int tcp_sock, udp_sock;
 
 void print(char *msg) {
@@ -49,9 +44,9 @@ int main(int argc, char* argv[]) {
     // Change to sigaction
     signal(SIGINT, server_close);
 
-    struct sockaddr_in server_tcp, server_udp, client;
+    struct sockaddr_in server_tcp, server_udp;
     memset(&server_tcp, 0, sizeof(server_tcp));
-    memset(&client, 0, sizeof(client));
+    memset(&server_udp, 0, sizeof(server_udp));
 
     server_tcp.sin_family = AF_INET;
     server_tcp.sin_addr.s_addr = htonl(INADDR_ANY);
@@ -82,7 +77,7 @@ int main(int argc, char* argv[]) {
     } else puts("[Server] Bound UDP socket");
 
     // TODO: Check if useful to increase backlog
-    if (listen(tcp_sock, 1) == -1) {
+    if (listen(tcp_sock, 5) == -1) {
         perror("[Server] Failed to listen on socket");
         server_close(-1);
     } else puts("[Server] Listening on TCP socket");

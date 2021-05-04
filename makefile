@@ -7,7 +7,7 @@ client.app: src/client.c
 	${CC} ${FLAGS} $< -o $@
 
 server.app: src/server.c src/configcli.c
-	${CC} ${FLAGS} $^ -o $@
+	${CC} ${FLAGS} -pthread $^ -o $@
 
 admin.app: src/admin.c
 	${CC} ${FLAGS} $< -o $@
