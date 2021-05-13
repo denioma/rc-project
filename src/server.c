@@ -8,9 +8,15 @@
 #include <sys/socket.h>
 #include <sys/wait.h>
 
+#include "libs/users.h"
+
+void load_users(char* file);
+int save_users(char* file);
+void free_users(user* node);
+
 int tcp_sock, udp_sock;
 
-void print(char *msg) {
+void print(char* msg) {
     printf("[Server] %s\n", msg);
 }
 
@@ -24,23 +30,31 @@ void server_close(int signum) {
         perror("Failed to close UDP socket");
     else puts("[Server] UDP socket closed");
     puts("\n[Server] Server closed");
+    if (modified) save_users(registry_file);
+    free_users(root);
     if (signum == SIGINT || signum == 0) exit(0);
     else exit(1);
 }
 
+// Accept TCP connections to manager registry file
 extern void accepting();
+extern int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast);
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
         fprintf(stderr, "Usage: ./server <client port> <config port> <registry file>\n");
         exit(1);
     }
+
     tcp_sock = udp_sock = -1;
-    const int client_port = atoi(*(argv+1));
-    const int config_port = atoi(*(argv+2));
-    // TODO: Enable support for registry file
-    // const char *registry = *(argv+3);
-    
+    const int client_port = atoi(*(argv + 1));
+    const int config_port = atoi(*(argv + 2));
+    registry_file = *(argv + 3);
+
+    root = NULL;
+    modified = false;
+    load_users(registry_file);
+
     // Change to sigaction
     signal(SIGINT, server_close);
 
@@ -86,7 +100,101 @@ int main(int argc, char* argv[]) {
     if (fork() == 0) {
         accepting();
     }
+
     pause();
 
     return 0;
+}
+
+/* ----- Registry File Loading and Unloading ----- */
+
+void load_users(char* file) {
+    FILE* registry = fopen(file, "r");
+    if (!registry) {
+        perror("Failed to open registry file");
+        exit(1);
+    }
+
+    char* token;
+    char entry[BUFFSIZE];
+    char user[ENTRYSIZE], pass[ENTRYSIZE], ip[INET_ADDRSTRLEN];
+    bool cs, p2p, multicast;
+    while (1) {
+        if (!fgets(entry, sizeof(entry), registry)) break;
+        // Parse username
+        token = strtok(entry, ";");
+        if (token) strncpy(user, token, sizeof(user));
+        else continue;
+        // Parse password
+        token = strtok(NULL, ";");
+        if (token) strncpy(pass, token, sizeof(pass));
+        else continue;
+        // Parse ip
+        token = strtok(NULL, ";");
+        if (token) strncpy(ip, token, sizeof(ip)); 
+        else continue;
+        // Parse cs
+        token = strtok(NULL, ";");
+        if (token) {
+            if (strcmp(token, "yes") == 0) cs = true;
+            else if (strcmp(token, "no") == 0) cs = false;
+            else continue;
+        } else continue;
+        // Parse p2p
+        token = strtok(NULL, ";");
+        if (token) {
+            if (strcmp(token, "yes") == 0) p2p = true;
+            else if (strcmp(token, "no") == 0) p2p = false;
+            else continue;
+        } else continue;
+        // Parse multicast
+        token = strtok(NULL, "\n");
+        if (token) {
+            if (strcmp(token, "yes") == 0) multicast = true;
+            else if (strcmp(token, "no") == 0) multicast = false;
+            else continue;
+        } else continue;
+
+        if (!add_user(user, pass, ip, cs, p2p, multicast))
+            puts("[Server] USER");
+    }
+
+    fclose(registry);
+}
+
+void dump(FILE* stream) {
+    if (!root) return;
+    user* curr = root;
+    char yes[] = "yes", no[] = "no";
+    char* cs, * p2p, * multicast;
+    while (1) {
+        if (curr->server) cs = yes;
+        else cs = no;
+        if (curr->p2p) p2p = yes;
+        else p2p = no;
+        if (curr->multicast) multicast = yes;
+        else multicast = no;
+        fprintf(stream, "%s;%s;%s;%s;%s;%s\n",
+            curr->username, curr->ip, curr->pass, cs, p2p, multicast);
+        if (curr->next) curr = curr->next;
+        else break;
+    }
+}
+
+int save_users(char* file) {
+    FILE* registry = fopen(file, "w");
+    if (!registry) {
+        perror("Failed to open registry file");
+        dump(stdout);
+        return 1;
+    }
+    dump(registry);
+    fclose(registry);
+    return 0;
+}
+
+void free_users(user* node) {
+    if (!node) return;
+    if (node->next) free_users(node->next);
+    free(node);
 }
