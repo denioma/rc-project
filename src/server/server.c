@@ -4,6 +4,7 @@
 #include <signal.h>
 #include <string.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/wait.h>
@@ -15,6 +16,7 @@ int save_users(char* file);
 void free_users(user* node);
 
 int tcp_sock, udp_sock;
+pthread_t client_collector;
 
 void print(char* msg) {
     printf("[Server] %s\n", msg);
@@ -39,6 +41,8 @@ void server_close(int signum) {
 // Accept TCP connections to manager registry file
 extern void accepting();
 extern int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast);
+
+void udp_listen();
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
@@ -101,9 +105,62 @@ int main(int argc, char* argv[]) {
         accepting();
     }
 
+    udp_listen();
     pause();
 
     return 0;
+}
+
+/* ----- UDP listener ----- */
+
+struct sockaddr_in addr;
+socklen_t slen;
+void serve(char *msg);
+
+void udp_listen() {
+    slen = sizeof(addr);
+    char buff[BUFFSIZE];
+    while (1) {
+        if (recvfrom(udp_sock, buff, sizeof(buff), 0, (struct sockaddr*)&addr, &slen) && fork() == 0) {
+            serve(buff);
+            exit(0);
+        }
+    }
+}
+
+/* ----- Serving clients ----- */
+
+void auth(char *msg) {
+    char user[ENTRYSIZE], pass[ENTRYSIZE];
+    strtok(msg, " ");
+    char *token = strtok(NULL, " ");
+    strncpy(user, token, sizeof(user));
+    token = strtok(NULL, " ");
+    strncpy(pass, token, sizeof(pass));
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    if (findUser(user, pass, ip)) {
+        // TODO Mutex this
+        sendto(udp_sock, "SUCCESS", strlen("SUCCESS")+1, 0, (struct sockaddr*) &addr, slen);
+    } else {
+        sendto(udp_sock, "FAIL", strlen("FAIL")+1, 0, (struct sockaddr*) &addr, slen);
+    }
+}
+
+void serve(char *msg) {
+    if (strncmp(msg, "AUTH", 4) == 0) auth(msg);
+    else puts("What?");
+}   
+
+void* proc_collector() {
+    printf("[Client collector] Started\n");
+    pid_t collecting;
+    while (1) {
+        sleep(60);
+        puts("[CLI collector] Heartbeat");
+        while((collecting = waitpid(0, NULL, WNOHANG)) > 0)
+            printf("[Client collector] Collected worker %u\n", collecting);
+    }
 }
 
 /* ----- Registry File Loading and Unloading ----- */

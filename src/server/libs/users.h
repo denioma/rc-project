@@ -1,3 +1,7 @@
+#ifndef INET_ADDRSTRLEN
+#define INET_ADDRSTRLEN 16
+#endif
+
 #define ENTRYSIZE 256
 #define BUFFSIZE 1024
 
@@ -8,9 +12,12 @@ typedef struct user_struct {
     char pass[BUFFSIZE];
     char ip[INET_ADDRSTRLEN];
     bool server, p2p, multicast;
+    struct sockaddr_in* addr; // This should be a full placeholder, not a pointer, me thinks
     struct user_struct* next;
 } user;
 
 user* root;
 bool modified;
 char* registry_file;
+
+user* findUser(char *username, char* pass, char *ip);
