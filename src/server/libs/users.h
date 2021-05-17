@@ -21,3 +21,6 @@ bool modified;
 char* registry_file;
 
 user* findUser(char *username, char* pass, char *ip);
+void list_users();
+int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast);
+void del_user(char* opt);

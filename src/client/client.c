@@ -47,8 +47,8 @@ int main(int argc, char* argv[]) {
     }
 
     struct timeval timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_usec = 500000;
+    timeout.tv_sec = 2;
+    timeout.tv_usec = 0;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     if (connect(sock, (struct sockaddr*) &addr, slen) < 0) {
@@ -89,13 +89,12 @@ int auth(struct sockaddr_in* addr, socklen_t* slen) {
     pass[strcspn(pass, "\n")] = 0;
 
     char buffer[BUFFSIZE];
-    snprintf(buffer, sizeof(buffer), "AUTH %s %s", user, pass);
-    sendto(sock, buffer, strlen(buffer) + 1, 0, (struct sockaddr*)addr, *slen);
-
     int recvsize;
     do {
+        snprintf(buffer, sizeof(buffer), "AUTH %s %s", user, pass);
+        sendto(sock, buffer, strlen(buffer) + 1, 0, (struct sockaddr*)addr, *slen);
         recvsize = recvfrom(sock, buffer, sizeof(buffer), 0, NULL, NULL);
-    } while (recvsize != -1);
+    } while (recvsize == -1);
     buffer[recvsize] = 0;
     if (strcmp(buffer, "SUCCESS") == 0) {
         int perms;
