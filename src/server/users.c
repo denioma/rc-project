@@ -5,19 +5,23 @@
 
 extern void sndmsg(char *msg);
 
-user* findUser(char *username, char* pass, char *ip) {
-    printf("[AUTH] Trying to authenticate %s: user: %s, pass: %s\n", ip, username, pass);
+user* findUser(char* username, char* ip) {
     if (!root) return NULL;
     user* curr = root;
     while (curr != NULL) {
         if (strcmp(username, curr->username) == 0) {
-            if (strcmp(pass, curr->pass) == 0) {
-                if (strcmp(ip, curr->ip) == 0) return curr;
-                else return NULL;
-            } else return NULL;
+            if (strcmp(ip, curr->ip) == 0) return curr;
+            else return NULL;
         } else curr = curr->next;
     }
     return NULL;
+}
+
+user* matchUser(char *username, char* pass, char *ip) {
+    if (!root) return NULL;
+    user* curr = findUser(username, ip);
+    if (curr && strcmp(pass, curr->pass) == 0) return curr;
+    else return NULL;
 }
 
 // TODO delete user

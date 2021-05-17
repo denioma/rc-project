@@ -1,4 +1,4 @@
-#include <netdb.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -23,6 +23,8 @@ void print(char* msg) {
 }
 
 void server_close(int signum) {
+    pthread_cancel(client_collector);
+    pthread_join(client_collector, NULL);
     while (wait(NULL) != -1);
     if (signum == SIGINT) print("Interrupt received. Closing server...");
     if (tcp_sock != -1 && close(tcp_sock))
@@ -43,6 +45,7 @@ extern void accepting();
 extern int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast);
 
 void udp_listen();
+void* proc_collector();
 
 int main(int argc, char* argv[]) {
     if (argc != 4) {
@@ -105,6 +108,7 @@ int main(int argc, char* argv[]) {
         accepting();
     }
 
+    pthread_create(&client_collector, NULL, proc_collector, NULL);
     udp_listen();
     pause();
 
@@ -142,7 +146,8 @@ void auth(char *msg) {
     
     user* find;
     char buff[BUFFSIZE];
-    if ((find = findUser(username, pass, ip))) {
+    printf("[AUTH] Trying to authenticate %s: user: %s, pass: %s\n", ip, username, pass);
+    if ((find = matchUser(username, pass, ip))) {
         puts("[AUTH] User authorized");
         int perms = find->server * 100 + find->p2p * 10 + find->multicast;
         snprintf(buff, sizeof(buff),"%d", perms);
@@ -155,8 +160,21 @@ void auth(char *msg) {
     }
 }
 
+void bind_client(char *msg) {
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    strtok(msg, " ");
+    char* username = strtok(NULL, " ");
+    user* client = findUser(username, ip); 
+    if (client) {
+        client->msg_addr = addr;
+        puts("[BIND] Client message address learnt");
+    }
+}
+
 void serve(char *msg) {
     if (strncmp(msg, "AUTH", 4) == 0) auth(msg);
+    else if (strcmp(msg, "BIND")) bind_client(msg);
     else puts("What?");
 }   
 

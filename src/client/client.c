@@ -3,6 +3,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <netdb.h>
+#include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
@@ -12,9 +13,11 @@
 
 typedef enum { false, true } bool;
 
-int sock;
+int sock, rcv_sock;
 struct sockaddr_in addr;
 bool cs, p2p, multicast;
+char username[AUTHSIZE];
+char buff[BUFFSIZE];
 
 int auth(struct sockaddr_in* addr, socklen_t* slen);
 void menu();
@@ -33,7 +36,6 @@ int main(int argc, char* argv[]) {
     // Parse arguments
     char* hostname = *(argv + 1);
     int port = atoi(*(argv + 2));
-    printf("%s:%d\n", hostname, port);
 
     // Get IP from hostname
     struct hostent* hostPtr;
@@ -49,8 +51,13 @@ int main(int argc, char* argv[]) {
     addr.sin_port = htons(port);
     socklen_t slen = sizeof(addr);
 
-    // Create UDP socket
+    // Create UDP socket for server opeartions
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
+        fprintf(stderr, "Failed to open socket\n");
+        exit(1);
+    }
+
+    if ((rcv_sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
         fprintf(stderr, "Failed to open socket\n");
         exit(1);
     }
@@ -62,7 +69,7 @@ int main(int argc, char* argv[]) {
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
 
     // Set socket to only receive datagrams from server
-    if (connect(sock, (struct sockaddr*) &addr, slen) < 0) {
+    if (connect(sock, (struct sockaddr*)&addr, slen) < 0) {
         fprintf(stderr, "Failed to connect to server\n");
         exit(1);
     }
@@ -81,6 +88,9 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
+    snprintf(buff, sizeof(buff), "BIND %s", username);
+    sendto(rcv_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, slen);
+
     printf("C-S: %d | P2P: %d | Multicast: %d\n", cs, p2p, multicast);
     while (1) menu();
 
@@ -90,12 +100,27 @@ int main(int argc, char* argv[]) {
     return 0;
 }
 
+void* incoming_msg() {
+    struct sockaddr_in rcvaddr;
+    socklen_t addrlen;
+    char buff[BUFFSIZE], ip[INET_ADDRSTRLEN];
+    int recvlen;
+    short int port;
+    while (1) {
+        memset(&rcvaddr, 0, sizeof(rcvaddr));
+        recvlen = recvfrom(rcv_sock, buff, sizeof(buff), 0, (struct sockaddr*) &rcvaddr, &addrlen);
+        buff[recvlen] = 0;
+        inet_ntop(AF_INET, &(rcvaddr.sin_addr), ip, sizeof(ip));
+        port = ntohs(rcvaddr.sin_port);
+        printf("Received from %s:%d >> %s\n", ip, port, buff);
+    }
+}
+
 int auth(struct sockaddr_in* addr, socklen_t* slen) {
     // Get username and password input
     printf("Username: ");
-    char user[AUTHSIZE];
-    fgets(user, sizeof(user), stdin);
-    user[strcspn(user, "\n")] = 0;
+    fgets(username, sizeof(username), stdin);
+    username[strcspn(username, "\n")] = 0;
     printf("Password: ");
     char pass[AUTHSIZE];
     fgets(pass, sizeof(pass), stdin);
@@ -105,7 +130,7 @@ int auth(struct sockaddr_in* addr, socklen_t* slen) {
     char buffer[BUFFSIZE];
     int recvsize;
     do {
-        snprintf(buffer, sizeof(buffer), "AUTH %s %s", user, pass);
+        snprintf(buffer, sizeof(buffer), "AUTH %s %s", username, pass);
         sendto(sock, buffer, strlen(buffer) + 1, 0, (struct sockaddr*)addr, *slen);
         recvsize = recvfrom(sock, buffer, sizeof(buffer), 0, NULL, NULL);
     } while (recvsize == -1);
@@ -118,8 +143,7 @@ int auth(struct sockaddr_in* addr, socklen_t* slen) {
         p2p = perms / 10 % 10;
         multicast = perms % 10;
         return 1;
-    }
-    else return 0;
+    } else return 0;
 }
 
 
@@ -128,28 +152,28 @@ void menu() {
     puts("2 - Send a message via P2P");
     puts("3 - Send a group message");
     puts("4 - Quit");
-    
+
     printf(">> ");
     int opt;
     do {
         scanf("%d", &opt);
     } while (opt < 1 || opt > 4);
-    
+
     switch (opt) {
-        case 1:
-            if (cs) puts("Imagine this works\n");
-            else puts("You don't got permission fuckwad\n");
-            break;
-        case 2:
-            if (p2p) puts("Imagine this works too\n");
-            else puts("You don't got permission fuckwad\n");
-            break;
-        case 3:
-            if (multicast) puts("Imagine this also works\n");
-            else puts("You don't got permission fuckwad\n");
-            break;
-        case 4:
-            close_client(0);
-            break;
+    case 1:
+        if (cs) puts("Imagine this works\n");
+        else puts("You don't got permission fuckwad\n");
+        break;
+    case 2:
+        if (p2p) puts("Imagine this works too\n");
+        else puts("You don't got permission fuckwad\n");
+        break;
+    case 3:
+        if (multicast) puts("Imagine this also works\n");
+        else puts("You don't got permission fuckwad\n");
+        break;
+    case 4:
+        close_client(0);
+        break;
     }
 }

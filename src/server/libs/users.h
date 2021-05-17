@@ -1,3 +1,5 @@
+#include <netdb.h>
+
 #ifndef INET_ADDRSTRLEN
 #define INET_ADDRSTRLEN 16
 #endif
@@ -12,7 +14,7 @@ typedef struct user_struct {
     char pass[BUFFSIZE];
     char ip[INET_ADDRSTRLEN];
     bool server, p2p, multicast;
-    struct sockaddr_in* addr; // This should be a full placeholder, not a pointer, me thinks
+    struct sockaddr_in msg_addr; // This should be a full placeholder, not a pointer, me thinks
     struct user_struct* next;
 } user;
 
@@ -20,7 +22,8 @@ user* root;
 bool modified;
 char* registry_file;
 
-user* findUser(char *username, char* pass, char *ip);
+user* findUser(char* username, char* ip);
+user* matchUser(char *username, char* pass, char *ip);
 void list_users();
 int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast);
 void del_user(char* opt);

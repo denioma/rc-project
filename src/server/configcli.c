@@ -22,7 +22,7 @@ void* collector() {
     pid_t collecting;
     while (1) {
         sleep(60);
-        puts("[CLI collector] Heartbeat");
+        // puts("[CLI collector] Heartbeat");
         while((collecting = waitpid(0, NULL, WNOHANG)) > 0)
             printf("[CLI collector] Collected worker %u\n", collecting);
     }
