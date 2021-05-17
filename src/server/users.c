@@ -1,6 +1,9 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "libs/users.h"
+
+extern void sndmsg(char *msg);
 
 user* findUser(char *username, char* pass, char *ip) {
     printf("[AUTH] Trying to authenticate %s: user: %s, pass: %s\n", ip, username, pass);
