@@ -143,12 +143,14 @@ void auth(char *msg) {
     user* find;
     char buff[BUFFSIZE];
     if ((find = findUser(username, pass, ip))) {
+        puts("[AUTH] User authorized");
         int perms = find->server * 100 + find->p2p * 10 + find->multicast;
         snprintf(buff, sizeof(buff),"%d", perms);
         // TODO Mutex this
         sendto(udp_sock, "SUCCESS", strlen("SUCCESS")+1, 0, (struct sockaddr*) &addr, slen);
         sendto(udp_sock, &perms, sizeof(perms), 0,(struct sockaddr*) &addr, slen);
     } else {
+        puts("User not authorized");
         sendto(udp_sock, "FAIL", strlen("FAIL")+1, 0, (struct sockaddr*) &addr, slen);
     }
 }

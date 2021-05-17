@@ -13,7 +13,8 @@ user* findUser(char *username, char* pass, char *ip) {
         if (strcmp(username, curr->username) == 0) {
             if (strcmp(pass, curr->pass) == 0) {
                 if (strcmp(ip, curr->ip) == 0) return curr;
-            }
+                else return NULL;
+            } else return NULL;
         } else curr = curr->next;
     }
     return NULL;
