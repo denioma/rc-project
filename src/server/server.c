@@ -131,17 +131,23 @@ void udp_listen() {
 /* ----- Serving clients ----- */
 
 void auth(char *msg) {
-    char user[ENTRYSIZE], pass[ENTRYSIZE];
+    char username[ENTRYSIZE], pass[ENTRYSIZE];
     strtok(msg, " ");
     char *token = strtok(NULL, " ");
-    strncpy(user, token, sizeof(user));
+    strncpy(username, token, sizeof(username));
     token = strtok(NULL, " ");
     strncpy(pass, token, sizeof(pass));
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
-    if (findUser(user, pass, ip)) {
+    
+    user* find;
+    char buff[BUFFSIZE];
+    if ((find = findUser(username, pass, ip))) {
+        int perms = find->server * 100 + find->p2p * 10 + find->multicast;
+        snprintf(buff, sizeof(buff),"%d", perms);
         // TODO Mutex this
         sendto(udp_sock, "SUCCESS", strlen("SUCCESS")+1, 0, (struct sockaddr*) &addr, slen);
+        sendto(udp_sock, &perms, sizeof(perms), 0,(struct sockaddr*) &addr, slen);
     } else {
         sendto(udp_sock, "FAIL", strlen("FAIL")+1, 0, (struct sockaddr*) &addr, slen);
     }

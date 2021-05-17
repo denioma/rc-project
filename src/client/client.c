@@ -5,11 +5,15 @@
 #include <netdb.h>
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 
 #define BUFFSIZE 512
 #define AUTHSIZE 32
 
+typedef enum { false, true } bool;
+
 int sock;
+bool cs, p2p, multicast;
 
 int auth(struct sockaddr_in* addr, socklen_t* slen);
 
@@ -19,11 +23,12 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
-    const char *hostname = *(argv+1);
-    const short int port = atoi(*(argv+2));
+    char* hostname = *(argv + 1);
+    int port = atoi(*(argv + 2));
+    printf("%s:%d\n", hostname, port);
 
     struct sockaddr_in addr;
-    struct hostent *hostPtr;
+    struct hostent* hostPtr;
 
     if (!(hostPtr = gethostbyname(hostname))) {
         perror("Failed to get host");
@@ -38,27 +43,34 @@ int main(int argc, char* argv[]) {
 
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
         fprintf(stderr, "Failed to open socket\n");
-        exit(-1);
+        exit(1);
     }
-  
-    if (connect(sock, (struct sockaddr*)&addr, slen) < 0) {
+
+    struct timeval timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_usec = 500000;
+    setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+
+    if (connect(sock, (struct sockaddr*) &addr, slen) < 0) {
         fprintf(stderr, "Failed to connect to server\n");
-        exit(-1);
+        exit(1);
     }
 
     // Request user authentication
     int attempts;
     for (attempts = 0; attempts < 3; attempts++) {
         if (auth(&addr, &slen)) {
-            puts("Authentication successful");
+            puts("Authentication successful\n");
             break;
         } else puts("Authentication failed");
     }
     if (attempts == 3) {
         puts("Failed authentication too many times");
         close(sock);
-        exit(1);   
+        exit(1);
     }
+
+    printf("C-S: %d | P2P: %d | Multicast: %d\n", cs, p2p, multicast);
 
     puts("Exiting");
     close(sock);
@@ -75,13 +87,23 @@ int auth(struct sockaddr_in* addr, socklen_t* slen) {
     char pass[AUTHSIZE];
     fgets(pass, sizeof(pass), stdin);
     pass[strcspn(pass, "\n")] = 0;
-    
+
     char buffer[BUFFSIZE];
     snprintf(buffer, sizeof(buffer), "AUTH %s %s", user, pass);
-    sendto(sock, buffer, strlen(buffer)+1, 0, (struct sockaddr*) addr, *slen);
+    sendto(sock, buffer, strlen(buffer) + 1, 0, (struct sockaddr*)addr, *slen);
 
-    int recvsize = recvfrom(sock, buffer, sizeof(buffer), 0, NULL, NULL);
-    buffer[recvsize] = 0; 
-    if (strcmp(buffer, "SUCCESS") == 0) return 1;
+    int recvsize;
+    do {
+        recvsize = recvfrom(sock, buffer, sizeof(buffer), 0, NULL, NULL);
+    } while (recvsize != -1);
+    buffer[recvsize] = 0;
+    if (strcmp(buffer, "SUCCESS") == 0) {
+        int perms;
+        recvfrom(sock, &perms, sizeof(perms), 0, NULL, NULL);
+        cs = perms / 100 % 10;
+        p2p = perms / 10 % 10;
+        multicast = perms % 10;
+        return 1;
+    }
     else return 0;
 }
