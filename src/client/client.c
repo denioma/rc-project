@@ -198,7 +198,7 @@ void menu() {
 
     switch (opt) {
     case 1:
-        if (cs) puts("Imagine this works\n");
+        if (cs) cs_message();
         else puts("You don't got permission fuckwad\n");
         break;
     case 2:
