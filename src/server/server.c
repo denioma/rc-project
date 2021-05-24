@@ -23,8 +23,6 @@ void print(char* msg) {
 }
 
 void server_close(int signum) {
-    pthread_cancel(client_collector);
-    pthread_join(client_collector, NULL);
     while (wait(NULL) != -1);
     if (signum == SIGINT) print("Interrupt received. Closing server...");
     if (tcp_sock != -1 && close(tcp_sock))
@@ -44,7 +42,7 @@ void server_close(int signum) {
 }
 
 // Accept TCP connections to manager registry file
-extern void accepting();
+extern void cli_setup();
 extern int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast);
 
 void udp_listen();
@@ -108,7 +106,7 @@ int main(int argc, char* argv[]) {
 
     puts("[Server] Send ^C to close server");
     if (fork() == 0) {
-        accepting();
+        cli_setup();
     }
 
     // pthread_create(&client_collector, NULL, proc_collector, NULL);
@@ -283,8 +281,7 @@ void load_users(char* file) {
     char entry[BUFFSIZE];
     char user[ENTRYSIZE], pass[ENTRYSIZE], ip[INET_ADDRSTRLEN];
     bool cs, p2p, multicast;
-    while (1) {
-        if (!fgets(entry, sizeof(entry), registry)) break;
+    while (fgets(entry, sizeof(entry), registry)) {
         // Parse username
         token = strtok(entry, ";");
         if (token) strncpy(user, token, sizeof(user));
@@ -312,16 +309,14 @@ void load_users(char* file) {
             else continue;
         } else continue;
         // Parse multicast
-        token = strtok(NULL, "\n");
+        token = strtok(NULL, "\r\n");
         if (token) {
             if (strcmp(token, "yes") == 0) multicast = true;
             else if (strcmp(token, "no") == 0) multicast = false;
             else continue;
         } else continue;
-
         add_user(user, pass, ip, cs, p2p, multicast);
     }
-
     fclose(registry);
 }
 

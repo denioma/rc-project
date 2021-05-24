@@ -36,7 +36,7 @@ user* matchUser(char *username, char* pass, char *ip) {
 // TODO delete user
 void del_user(char* opt) {
     if (!root) {
-        sndmsg("[DEL] Registry is empty");
+        sndmsg("[DEL] Registry is empty\n");
         return;
     }
 
@@ -96,7 +96,7 @@ int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool m
 
 void list_users() {
     if (!root) {
-        sndmsg("[LIST] Registry is empty");
+        sndmsg("[LIST] Registry is empty\n");
         return;
     }
 
