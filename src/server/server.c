@@ -214,17 +214,32 @@ void forward_threaded(char* msg, struct sockaddr_in* addr) {
     }
 }
 
+void peer_threaded(char* msg, struct sockaddr_in* addr) {
+    strtok(msg, " ");
+    char* username = strtok(NULL, "\0");
+    if (!username) {
+        // TODO Complain
+    }
+    user* dest = findUser(username, NULL);
+    char buff[BUFFSIZE];
+    if (dest) {
+        snprintf(buff, sizeof(buff), "%s %d", dest->ip, dest->msgport);
+        sendto(udp_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) addr, sizeof(*addr));
+    }
+}
+
 void* serve_threaded(void *v_args) {
     thread_arg* args = (thread_arg*) v_args;
     char *msg = args->msg;
     struct sockaddr_in* addr = &(args->addr);
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &(addr->sin_addr), ip, sizeof(ip));
-    short int port = addr->sin_port;
+    short int port = ntohs(addr->sin_port);
     printf("[%s:%d] %s\n", ip, port, msg);
     if (strncmp(msg, "AUTH", 4) == 0) auth_threaded(msg, addr);
     else if (strncmp(msg, "BIND", 4) == 0) bind_threaded(msg, addr);
     else if (strncmp(msg, "MSG", 3) == 0) forward_threaded(msg, addr);
+    else if (strncmp(msg, "PEER", 4) == 0) peer_threaded(msg, addr);
     else puts("What?");
     free(v_args);
     pthread_exit(NULL);

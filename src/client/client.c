@@ -185,6 +185,36 @@ void cs_message() {
     // TODO maybe do something with the server response?
 }
 
+void peer() {
+    char username[AUTHSIZE], buff[BUFFSIZE], response[BUFFSIZE];
+    printf("To: ");
+    fgets(username, sizeof(username), stdin);
+    username[strcspn(username, "\n")] = 0;
+    snprintf(buff, sizeof(buff), "PEER %s", username);
+    int recvsize;
+    do {
+        sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, slen);
+        recvsize = recvfrom(sock, response, sizeof(response), 0, NULL, NULL);
+    } while (recvsize == -1);
+    response[recvsize] = 0;
+    struct sockaddr_in peer_addr;
+    char* token = strtok(response, " ");
+    if (!token) { 
+        // TODO Complain
+    } 
+    inet_pton(AF_INET, token, &peer_addr.sin_addr.s_addr);
+    token = strtok(NULL, "\0");
+    if (!token) {
+        // TODO Complain
+    }
+    peer_addr.sin_family = AF_INET;
+    peer_addr.sin_port = atoi(token);
+    printf("Message: ");
+    fgets(buff, sizeof(buff), stdin);
+    buff[strcspn(buff, "\n")] = 0;
+    sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &peer_addr, sizeof(peer_addr));
+}
+
 void menu() {
     puts("1 - Send a message via server");
     puts("2 - Send a message via P2P");
@@ -200,15 +230,15 @@ void menu() {
     switch (opt) {
     case 1:
         if (cs) cs_message();
-        else puts("You don't got permission fuckwad\n");
+        else puts("You don't got permission fuckwad\n"); // TODO Substituir isto antes da entrega
         break;
     case 2:
-        if (p2p) puts("Imagine this works too\n");
-        else puts("You don't got permission fuckwad\n");
+        if (p2p) peer();
+        else puts("You don't got permission fuckwad\n"); // TODO Substituir isto antes da entrega
         break;
     case 3:
         if (multicast) puts("Imagine this also works\n");
-        else puts("You don't got permission fuckwad\n");
+        else puts("You don't got permission fuckwad\n"); // TODO Substituir isto antes da entrega
         break;
     case 4:
         close_client(0);
