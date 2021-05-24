@@ -195,7 +195,7 @@ void menu() {
     do {
         scanf("%d", &opt);
     } while (opt < 1 || opt > 4);
-
+    getchar();
     switch (opt) {
     case 1:
         if (cs) cs_message();
