@@ -6,12 +6,18 @@
 extern void sndmsg(char *msg);
 
 user* findUser(char* username, char* ip) {
+    printf("[DEBUG] Matching %s\n", username);
+    if (ip == NULL) puts("[DEBUG] No IP");
     if (!root) return NULL;
     user* curr = root;
     while (curr != NULL) {
         if (strcmp(username, curr->username) == 0) {
-            if (!ip || (ip && strcmp(ip, curr->ip) == 0)) return curr;
-            else return NULL;
+            puts("[DEBUG] Username match");
+            if (ip == NULL || strcmp(ip, curr->ip) == 0) return curr;
+            else {
+                puts("[DEBUG] NULL");
+                return NULL;
+            }
         } else curr = curr->next;
     }
     return NULL;
@@ -77,6 +83,7 @@ int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool m
     new->server = server;
     new->p2p = p2p;
     new->multicast = multicast;
+    new->msgport = 0;
     new->next = NULL;
     if (root) curr->next = new;
     else root = new;
@@ -93,8 +100,8 @@ void list_users() {
     char buff[BUFFSIZE];
     user *curr = root;
     while (1) {
-        snprintf(buff, sizeof(buff), "User: %s | IP: %s | Pass: %s | C-S: %d | P2P: %d | Multicast: %d\n", 
-                curr->username, curr->ip, curr->pass, curr->server, curr->p2p, curr->multicast);
+        snprintf(buff, sizeof(buff), "User: %s | IP: %s | Port: %d | Pass: %s | C-S: %d | P2P: %d | Multicast: %d\n", 
+                curr->username, curr->ip, curr->msgport, curr->pass, curr->server, curr->p2p, curr->multicast);
         sndmsg(buff);
         if (curr->next) curr = curr->next;
         else break;

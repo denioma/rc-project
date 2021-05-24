@@ -16,7 +16,7 @@ typedef struct user_struct {
     bool server, p2p, multicast;
     // IDEA Consider storing only the port -> smaller than storing sockaddr_in struct
     struct sockaddr_in msg_addr;
-    short int msgport;
+    int msgport;
     struct user_struct* next;
 } user;
 

@@ -172,29 +172,47 @@ void bind_client(char *msg) {
     if (client) {
         client->msg_addr = addr; // IDEA consider deprecating this
         client->msgport = addr.sin_port;
+        printf("[DEBUG] %d %d\n", addr.sin_port, client->msgport);
         puts("[BIND] Client message address learnt");
     }
 }
 
 void forward(char* msg) {
-    user* dest;
-    char user[ENTRYSIZE], payload[BUFFSIZE], * token;
+    char username[ENTRYSIZE], payload[BUFFSIZE], * token;
     strtok(msg, " ");
     token = strtok(NULL, " ");
-    if (!token) // TODO complain and not die to segmentation fault
-    strncpy(user, token, sizeof(user));
+    if (!token) {
+        puts("[MSG] Incomplete");
+        sendto(udp_sock, "0", 2, 0, (struct sockaddr*) &addr, sizeof(addr));
+        return;   
+    } puts(token);
+    strncpy(username, token, sizeof(username));
     token = strtok(NULL, " ");
-    if (!token) // TODO complain and not die to segmentation fault
+    if (!token) {
+        puts("[MSG] Incomplete");
+        sendto(udp_sock, "0", 2, 0, (struct sockaddr*) &addr, sizeof(addr));
+        return;   
+    } puts(token);
     strncpy(payload, token, sizeof(payload));
-    if ((dest = findUser(user, NULL))) {
+    printf("[DEBUG] MSG %s %s\n", username, payload);
+    user* dest = findUser(username, NULL);
+    printf("[DEBUG] dest->msgport: %d\n", dest->msgport);
+    if (dest && dest->msgport) {
+        char buff[] = "Message sent";
+        puts(buff);
         sendto(udp_sock, payload, strlen(payload)+1, 0, (struct sockaddr*) &dest->msg_addr, sizeof(dest->msg_addr));
-        sendto(udp_sock, "1", 2, 0, (struct sockaddr*) &addr, sizeof(addr));
-    } else sendto(udp_sock, "0", 2, 0, (struct sockaddr*) &addr, sizeof(addr));
+        sendto(udp_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, sizeof(addr));
+    } else {
+        char buff[] = "User not found";
+        puts(buff);
+        sendto(udp_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, sizeof(addr));
+    }
 }
 
 void serve(char *msg) {
+    printf("[Received] %s\n", msg);
     if (strncmp(msg, "AUTH", 4) == 0) auth(msg);
-    else if (strcmp(msg, "BIND")) bind_client(msg);
+    else if (strncmp(msg, "BIND", 4) == 0) bind_client(msg);
     else if (strncmp(msg, "MSG", 3) == 0) forward(msg);
     else puts("What?");
 }   
@@ -205,8 +223,8 @@ void* proc_collector() {
     while (1) {
         sleep(60);
         // puts("[CLI collector] Heartbeat");
-        while((collecting = waitpid(0, NULL, WNOHANG)) > 0)
-            printf("[Client collector] Collected worker %u\n", collecting);
+        while((collecting = waitpid(0, NULL, WNOHANG)) > 0);
+            // printf("[Client collector] Collected worker %u\n", collecting);
     }
 }
 
