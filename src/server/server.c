@@ -111,7 +111,7 @@ int main(int argc, char* argv[]) {
         accepting();
     }
 
-    pthread_create(&client_collector, NULL, proc_collector, NULL);
+    // pthread_create(&client_collector, NULL, proc_collector, NULL);
     udp_listen();
     pause();
 
@@ -122,22 +122,29 @@ int main(int argc, char* argv[]) {
 
 struct sockaddr_in addr;
 socklen_t slen;
-void serve(char *msg);
+void* serve_threaded(void *v_args);
+
+typedef struct {
+    char msg[BUFFSIZE];
+    struct sockaddr_in addr;
+} thread_arg;
 
 void udp_listen() {
-    slen = sizeof(addr);
-    char buff[BUFFSIZE];
+    int recvsize;
+    pthread_t new_thread;
     while (1) {
-        if (recvfrom(udp_sock, buff, sizeof(buff), 0, (struct sockaddr*)&addr, &slen) && fork() == 0) {
-            serve(buff);
-            exit(0);
+        thread_arg* args = malloc(sizeof(*args));
+        slen = sizeof(args->addr);
+        if ((recvsize = recvfrom(udp_sock, args->msg, sizeof(args->msg), 0, (struct sockaddr*) &args->addr, &slen))) {
+            args->msg[recvsize] = 0;
+            pthread_create(&new_thread, NULL, serve_threaded, args);
         }
     }
 }
 
-/* ----- Serving clients ----- */
+/* ----- Serving clientes (Threaded) ----- */
 
-void auth(char *msg) {
+void auth_threaded(char* msg, struct sockaddr_in* addr) {
     char username[ENTRYSIZE], pass[ENTRYSIZE];
     strtok(msg, " ");
     char *token = strtok(NULL, " ");
@@ -145,7 +152,7 @@ void auth(char *msg) {
     token = strtok(NULL, " ");
     strncpy(pass, token, sizeof(pass));
     char ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    inet_ntop(AF_INET, &addr->sin_addr, ip, sizeof(ip));
     
     user* find;
     char buff[BUFFSIZE];
@@ -155,42 +162,42 @@ void auth(char *msg) {
         int perms = find->server * 100 + find->p2p * 10 + find->multicast;
         snprintf(buff, sizeof(buff),"%d", perms);
         // TODO Mutex this (probably a named semaphore bc it's easier to open)
-        sendto(udp_sock, "SUCCESS", strlen("SUCCESS")+1, 0, (struct sockaddr*) &addr, slen);
-        sendto(udp_sock, &perms, sizeof(perms), 0,(struct sockaddr*) &addr, slen);
+        sendto(udp_sock, "SUCCESS", strlen("SUCCESS")+1, 0, (struct sockaddr*) addr, sizeof(*addr));
+        sendto(udp_sock, &perms, sizeof(perms), 0,(struct sockaddr*) addr, sizeof(*addr));
     } else {
         puts("User not authorized");
-        sendto(udp_sock, "FAIL", strlen("FAIL")+1, 0, (struct sockaddr*) &addr, slen);
+        sendto(udp_sock, "FAIL", strlen("FAIL")+1, 0, (struct sockaddr*) addr, sizeof(*addr));
     }
 }
 
-void bind_client(char *msg) {
+void bind_threaded(char *msg, struct sockaddr_in* addr) {
     char ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &addr.sin_addr, ip, sizeof(ip));
+    inet_ntop(AF_INET, &addr->sin_addr, ip, sizeof(ip));
     strtok(msg, " ");
     char* username = strtok(NULL, " ");
     user* client = findUser(username, ip); 
     if (client) {
-        client->msg_addr = addr; // IDEA consider deprecating this
-        client->msgport = addr.sin_port;
-        printf("[DEBUG] %d %d\n", addr.sin_port, client->msgport);
+        client->msg_addr = *addr; // IDEA consider deprecating this
+        client->msgport = addr->sin_port;
+        printf("[DEBUG] %d %d\n", addr->sin_port, client->msgport);
         puts("[BIND] Client message address learnt");
     }
 }
 
-void forward(char* msg) {
+void forward_threaded(char* msg, struct sockaddr_in* addr) {
     char username[ENTRYSIZE], payload[BUFFSIZE], * token;
     strtok(msg, " ");
     token = strtok(NULL, " ");
     if (!token) {
         puts("[MSG] Incomplete");
-        sendto(udp_sock, "0", 2, 0, (struct sockaddr*) &addr, sizeof(addr));
+        sendto(udp_sock, "0", 2, 0, (struct sockaddr*) addr, sizeof(addr));
         return;   
     } puts(token);
     strncpy(username, token, sizeof(username));
     token = strtok(NULL, " ");
     if (!token) {
         puts("[MSG] Incomplete");
-        sendto(udp_sock, "0", 2, 0, (struct sockaddr*) &addr, sizeof(addr));
+        sendto(udp_sock, "0", 2, 0, (struct sockaddr*) addr, sizeof(addr));
         return;   
     } puts(token);
     strncpy(payload, token, sizeof(payload));
@@ -209,13 +216,20 @@ void forward(char* msg) {
     }
 }
 
-void serve(char *msg) {
+void* serve_threaded(void *v_args) {
+    thread_arg* args = (thread_arg*) v_args;
+    char *msg = args->msg;
+    struct sockaddr_in* addr = &(args->addr);
     printf("[Received] %s\n", msg);
-    if (strncmp(msg, "AUTH", 4) == 0) auth(msg);
-    else if (strncmp(msg, "BIND", 4) == 0) bind_client(msg);
-    else if (strncmp(msg, "MSG", 3) == 0) forward(msg);
+    if (strncmp(msg, "AUTH", 4) == 0) auth_threaded(msg, addr);
+    else if (strncmp(msg, "BIND", 4) == 0) bind_threaded(msg, addr);
+    else if (strncmp(msg, "MSG", 3) == 0) forward_threaded(msg, addr);
     else puts("What?");
-}   
+    free(v_args);
+    pthread_exit(NULL);
+}
+
+/* ----- Serving clients (Forks) ----- */
 
 void* proc_collector() {
     printf("[Client collector] Started\n");
