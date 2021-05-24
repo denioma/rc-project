@@ -10,7 +10,7 @@ user* findUser(char* username, char* ip) {
     user* curr = root;
     while (curr != NULL) {
         if (strcmp(username, curr->username) == 0) {
-            if (strcmp(ip, curr->ip) == 0) return curr;
+            if (!ip || (ip && strcmp(ip, curr->ip) == 0)) return curr;
             else return NULL;
         } else curr = curr->next;
     }
@@ -26,18 +26,21 @@ user* matchUser(char *username, char* pass, char *ip) {
 
 // TODO delete user
 void del_user(char* opt) {
-    strtok(opt, " ");
-    char *username = strtok(opt, "\n");
     if (!root) {
         sndmsg("[DEL] Registry is empty");
         return;
     }
 
+    strtok(opt, " ");
+    char *username = strtok(NULL, "\n");
+    if (!username) return;
+    printf("[DEL] Attempting to remove user %s\n", username);
     user* curr, * prev;
     if (strcmp(root->username, username) == 0) {
         curr = root->next;
         free(root);
         root = curr;
+        if (modified == false) modified = true;
         return;
     }
     if (!root->next) return; 
@@ -47,6 +50,7 @@ void del_user(char* opt) {
         if (strcmp(curr->username, username) == 0) {
             prev->next = curr->next;
             free(curr);
+            if (modified == false) modified = true;
             return;
         }
         if (curr->next) {
@@ -86,10 +90,12 @@ void list_users() {
         return;
     }
 
+    char buff[BUFFSIZE];
     user *curr = root;
     while (1) {
-        printf("User: %s | IP: %s | Pass: %s | C-S: %d | P2P: %d | Multicast: %d\n", 
-                curr->username, curr->pass, curr->ip, curr->server, curr->p2p, curr->multicast);
+        snprintf(buff, sizeof(buff), "User: %s | IP: %s | Pass: %s | C-S: %d | P2P: %d | Multicast: %d\n", 
+                curr->username, curr->ip, curr->pass, curr->server, curr->p2p, curr->multicast);
+        sndmsg(buff);
         if (curr->next) curr = curr->next;
         else break;
     }

@@ -10,11 +10,13 @@
 typedef enum { false, true } bool;
 
 typedef struct user_struct {
-    char username[BUFFSIZE];
-    char pass[BUFFSIZE];
+    char username[ENTRYSIZE];
+    char pass[ENTRYSIZE];
     char ip[INET_ADDRSTRLEN];
     bool server, p2p, multicast;
-    struct sockaddr_in msg_addr; // This should be a full placeholder, not a pointer, me thinks
+    // IDEA Consider storing only the port -> smaller than storing sockaddr_in struct
+    struct sockaddr_in msg_addr;
+    short int msgport;
     struct user_struct* next;
 } user;
 

@@ -34,7 +34,10 @@ void server_close(int signum) {
         perror("Failed to close UDP socket");
     else puts("[Server] UDP socket closed");
     puts("\n[Server] Server closed");
-    if (modified) save_users(registry_file);
+    if (modified == true) {
+        puts("[Server] Changes made to users");
+        save_users(registry_file);
+    }
     free_users(root);
     if (signum == SIGINT || signum == 0) exit(0);
     else exit(1);
@@ -59,8 +62,8 @@ int main(int argc, char* argv[]) {
     registry_file = *(argv + 3);
 
     root = NULL;
-    modified = false;
     load_users(registry_file);
+    modified = false;
 
     // Change to sigaction
     signal(SIGINT, server_close);
@@ -151,7 +154,7 @@ void auth(char *msg) {
         puts("[AUTH] User authorized");
         int perms = find->server * 100 + find->p2p * 10 + find->multicast;
         snprintf(buff, sizeof(buff),"%d", perms);
-        // TODO Mutex this
+        // TODO Mutex this (probably a named semaphore bc it's easier to open)
         sendto(udp_sock, "SUCCESS", strlen("SUCCESS")+1, 0, (struct sockaddr*) &addr, slen);
         sendto(udp_sock, &perms, sizeof(perms), 0,(struct sockaddr*) &addr, slen);
     } else {
@@ -167,14 +170,32 @@ void bind_client(char *msg) {
     char* username = strtok(NULL, " ");
     user* client = findUser(username, ip); 
     if (client) {
-        client->msg_addr = addr;
+        client->msg_addr = addr; // IDEA consider deprecating this
+        client->msgport = addr.sin_port;
         puts("[BIND] Client message address learnt");
     }
+}
+
+void forward(char* msg) {
+    user* dest;
+    char user[ENTRYSIZE], payload[BUFFSIZE], * token;
+    strtok(msg, " ");
+    token = strtok(NULL, " ");
+    if (!token) // TODO complain and not die to segmentation fault
+    strncpy(user, token, sizeof(user));
+    token = strtok(NULL, " ");
+    if (!token) // TODO complain and not die to segmentation fault
+    strncpy(payload, token, sizeof(payload));
+    if ((dest = findUser(user, NULL))) {
+        sendto(udp_sock, payload, strlen(payload)+1, 0, (struct sockaddr*) &dest->msg_addr, sizeof(dest->msg_addr));
+        sendto(udp_sock, "1", 2, 0, (struct sockaddr*) &addr, sizeof(addr));
+    } else sendto(udp_sock, "0", 2, 0, (struct sockaddr*) &addr, sizeof(addr));
 }
 
 void serve(char *msg) {
     if (strncmp(msg, "AUTH", 4) == 0) auth(msg);
     else if (strcmp(msg, "BIND")) bind_client(msg);
+    else if (strncmp(msg, "MSG", 3) == 0) forward(msg);
     else puts("What?");
 }   
 
@@ -183,7 +204,7 @@ void* proc_collector() {
     pid_t collecting;
     while (1) {
         sleep(60);
-        puts("[CLI collector] Heartbeat");
+        // puts("[CLI collector] Heartbeat");
         while((collecting = waitpid(0, NULL, WNOHANG)) > 0)
             printf("[Client collector] Collected worker %u\n", collecting);
     }
@@ -208,13 +229,13 @@ void load_users(char* file) {
         token = strtok(entry, ";");
         if (token) strncpy(user, token, sizeof(user));
         else continue;
-        // Parse password
-        token = strtok(NULL, ";");
-        if (token) strncpy(pass, token, sizeof(pass));
-        else continue;
         // Parse ip
         token = strtok(NULL, ";");
         if (token) strncpy(ip, token, sizeof(ip)); 
+        else continue;
+        // Parse password
+        token = strtok(NULL, ";");
+        if (token) strncpy(pass, token, sizeof(pass));
         else continue;
         // Parse cs
         token = strtok(NULL, ";");
@@ -238,8 +259,7 @@ void load_users(char* file) {
             else continue;
         } else continue;
 
-        if (!add_user(user, pass, ip, cs, p2p, multicast))
-            puts("[Server] USER");
+        add_user(user, pass, ip, cs, p2p, multicast);
     }
 
     fclose(registry);

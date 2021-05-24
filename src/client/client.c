@@ -1,3 +1,5 @@
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,16 +17,26 @@ typedef enum { false, true } bool;
 
 int sock, rcv_sock;
 struct sockaddr_in addr;
+socklen_t slen;
 bool cs, p2p, multicast;
 char username[AUTHSIZE];
 char buff[BUFFSIZE];
+pthread_t receiver;
 
 int auth(struct sockaddr_in* addr, socklen_t* slen);
 void menu();
+void* incoming_msg();
 
 void close_client(int code) {
     close(sock);
+    pthread_cancel(receiver);
+    pthread_join(receiver, NULL);
+    close(rcv_sock);
     exit(code);
+}
+
+void sigint(int signo) {
+    if (signo == SIGINT) close_client(0);
 }
 
 int main(int argc, char* argv[]) {
@@ -32,6 +44,13 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Usage: ./server.app <host> <port>\n");
         exit(1);
     }
+
+    // Override SIGINT
+    struct sigaction interrupt;
+    interrupt.sa_handler = sigint;
+    interrupt.sa_flags = 0;
+    sigemptyset(&interrupt.sa_mask);
+    sigaction(SIGINT, &interrupt, NULL);
 
     // Parse arguments
     char* hostname = *(argv + 1);
@@ -49,7 +68,7 @@ int main(int argc, char* argv[]) {
     addr.sin_family = AF_INET;
     addr.sin_addr.s_addr = ((struct in_addr*)hostPtr->h_addr_list[0])->s_addr;
     addr.sin_port = htons(port);
-    socklen_t slen = sizeof(addr);
+    slen = sizeof(addr);
 
     // Create UDP socket for server opeartions
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
@@ -88,6 +107,7 @@ int main(int argc, char* argv[]) {
         exit(1);
     }
 
+    pthread_create(&receiver, NULL, incoming_msg, NULL);
     snprintf(buff, sizeof(buff), "BIND %s", username);
     sendto(rcv_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, slen);
 
@@ -146,6 +166,23 @@ int auth(struct sockaddr_in* addr, socklen_t* slen) {
     } else return 0;
 }
 
+void cs_message() {
+    char user[AUTHSIZE], payload[BUFFSIZE-AUTHSIZE-5];
+    printf("To: ");
+    fgets(user, sizeof(user), stdin);
+    user[strcspn(user, "\n")] = 0;
+    printf("Message: ");
+    fgets(payload, sizeof(payload), stdin);
+    payload[strcspn(payload, "\n")] = 0;
+    char msg[BUFFSIZE];
+    snprintf(msg, sizeof(msg), "MSG %s %s", user, payload);
+    int recvsize;
+    do {
+        sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
+        recvsize = recvfrom(sock, buff, sizeof(buff), 0, NULL, NULL);
+    } while (recvsize == -1);
+    // TODO maybe do something with the server response?
+}
 
 void menu() {
     puts("1 - Send a message via server");

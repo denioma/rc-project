@@ -64,13 +64,10 @@ void term(int signum) {
 
 void menu(char *opt) {
     char buff[BUFFSIZE];
-    if (strcmp(opt, "LIST") == 0) {
-        sndmsg("Not yet implemented!");
-        list_users();
-    }
+    if (strcmp(opt, "LIST") == 0) list_users();
     else if (strncmp(opt, "ADD", 3) == 0) sndmsg("Not yet implemented!");
     else if (strncmp(opt, "DEL", 3) == 0) {
-        sndmsg("Not yet implemented!");
+        puts("DEL");
         del_user(opt);
     }
     else if (strcmp(opt, "QUIT") == 0) cli_term(-1);
