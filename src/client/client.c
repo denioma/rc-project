@@ -28,6 +28,8 @@ void menu();
 void* incoming_msg();
 
 void close_client(int code) {
+    snprintf(buff, sizeof(buff), "BYE %s", username);
+    sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, slen);
     close(sock);
     pthread_cancel(receiver);
     pthread_join(receiver, NULL);
