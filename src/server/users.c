@@ -15,10 +15,13 @@ user* findUser(char* username, char* ip) {
             puts("[DEBUG] Username match");
             if (ip == NULL || strcmp(ip, curr->ip) == 0) return curr;
             else {
-                puts("[DEBUG] NULL");
+                puts("[DEBUG] IP is not a match");
                 return NULL;
             }
-        } else curr = curr->next;
+        } else {
+            puts("[DEBUG] Username is not a match");
+            curr = curr->next;
+        }
     }
     return NULL;
 }

@@ -113,7 +113,6 @@ int main(int argc, char* argv[]) {
 
     // pthread_create(&client_collector, NULL, proc_collector, NULL);
     udp_listen();
-    pause();
 
     return 0;
 }
@@ -194,7 +193,7 @@ void forward_threaded(char* msg, struct sockaddr_in* addr) {
         return;   
     } puts(token);
     strncpy(username, token, sizeof(username));
-    token = strtok(NULL, " ");
+    token = strtok(NULL, "\0");
     if (!token) {
         puts("[MSG] Incomplete");
         sendto(udp_sock, "0", 2, 0, (struct sockaddr*) addr, sizeof(addr));
@@ -203,16 +202,15 @@ void forward_threaded(char* msg, struct sockaddr_in* addr) {
     strncpy(payload, token, sizeof(payload));
     printf("[DEBUG] MSG %s %s\n", username, payload);
     user* dest = findUser(username, NULL);
-    printf("[DEBUG] dest->msgport: %d\n", dest->msgport);
     if (dest && dest->msgport) {
-        char buff[] = "Message sent";
-        puts(buff);
+        char response[] = "Message sent";
+        puts(response);
         sendto(udp_sock, payload, strlen(payload)+1, 0, (struct sockaddr*) &dest->msg_addr, sizeof(dest->msg_addr));
-        sendto(udp_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, sizeof(addr));
+        sendto(udp_sock, response, strlen(response)+1, 0, (struct sockaddr*) addr, sizeof(*addr));
     } else {
         char buff[] = "User not found";
         puts(buff);
-        sendto(udp_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, sizeof(addr));
+        sendto(udp_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) addr, sizeof(*addr));
     }
 }
 
@@ -220,7 +218,10 @@ void* serve_threaded(void *v_args) {
     thread_arg* args = (thread_arg*) v_args;
     char *msg = args->msg;
     struct sockaddr_in* addr = &(args->addr);
-    printf("[Received] %s\n", msg);
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(addr->sin_addr), ip, sizeof(ip));
+    short int port = addr->sin_port;
+    printf("[%s:%d] %s\n", ip, port, msg);
     if (strncmp(msg, "AUTH", 4) == 0) auth_threaded(msg, addr);
     else if (strncmp(msg, "BIND", 4) == 0) bind_threaded(msg, addr);
     else if (strncmp(msg, "MSG", 3) == 0) forward_threaded(msg, addr);

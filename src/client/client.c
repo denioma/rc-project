@@ -180,6 +180,7 @@ void cs_message() {
     do {
         sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
         recvsize = recvfrom(sock, buff, sizeof(buff), 0, NULL, NULL);
+        if (recvsize >= 0) puts(buff);
     } while (recvsize == -1);
     // TODO maybe do something with the server response?
 }
