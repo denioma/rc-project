@@ -16,33 +16,38 @@ int save_users(char* file);
 void free_users(user* node);
 
 int tcp_sock, udp_sock;
-pthread_t client_collector;
+extern int client_fd;
+pthread_t admincli;
 
 void print(char* msg) {
     printf("[Server] %s\n", msg);
 }
 
 void server_close(int signum) {
-    while (wait(NULL) != -1);
+    pthread_cancel(admincli);
+    pthread_join(admincli, NULL);
     if (signum == SIGINT) print("Interrupt received. Closing server...");
+    if (client_fd != -1 && close(client_fd))
+        perror("[Server] Failed to close TCP client socket");
+    else puts("[Server] TCP client socket closed");
     if (tcp_sock != -1 && close(tcp_sock))
-        perror("[Server] Failed to close TCP socket");
-    else print("TCP socket closed");
+        perror("[Server] Failed to close TCP greeter socket");
+    else puts("[Server] TCP greeter socket closed");
     if (udp_sock != -1 && close(udp_sock))
         perror("Failed to close UDP socket");
     else puts("[Server] UDP socket closed");
-    puts("\n[Server] Server closed");
     if (modified == true) {
         puts("[Server] Changes made to users");
         save_users(registry_file);
     }
     free_users(root);
+    puts("\n[Server] Server closed");
     if (signum == SIGINT || signum == 0) exit(0);
     else exit(1);
 }
 
 // Accept TCP connections to manager registry file
-extern void cli_setup();
+extern void* cli_setup();
 extern int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast);
 
 void udp_listen();
@@ -105,9 +110,11 @@ int main(int argc, char* argv[]) {
     } else puts("[Server] Listening on TCP socket");
 
     puts("[Server] Send ^C to close server");
-    if (fork() == 0) {
-        cli_setup();
-    }
+    // if (fork() == 0) {
+    //     cli_setup();
+    // }
+    pthread_create(&admincli, NULL, cli_setup, NULL);
+
 
     // pthread_create(&client_collector, NULL, proc_collector, NULL);
     udp_listen();

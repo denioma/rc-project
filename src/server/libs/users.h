@@ -14,7 +14,6 @@ typedef struct user_struct {
     char pass[ENTRYSIZE];
     char ip[INET_ADDRSTRLEN];
     bool server, p2p, multicast;
-    // IDEA Consider storing only the port -> smaller than storing sockaddr_in struct
     struct sockaddr_in msg_addr;
     unsigned short int msgport;
     struct user_struct* next;

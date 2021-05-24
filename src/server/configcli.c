@@ -27,16 +27,75 @@ void cli_print(char* msg, char* prefix) {
 void sndmsg(char* msg) {
     char buffer[BUFFSIZE];
     write(client_fd, msg, strlen(msg)+1);
-    msg[strcspn(msg, "\n")] = 0;
+    // msg[strcspn(msg, "\n")] = 0;
     snprintf(buffer, sizeof(buffer), "<< %s", msg);
     cli_print(buffer, prefix);
+}
+
+void parsing_err() {
+    sndmsg("Parsing error\n");
+}
+
+void new_user(char* opt) {
+    strtok(opt, " ");
+    char username[ENTRYSIZE], pass[ENTRYSIZE], ip[INET_ADDRSTRLEN];
+    bool cs, p2p, multicast;
+    char* token = strtok(NULL, " ");
+    // Parse username
+    if (!token) {
+        parsing_err();
+        return;
+    }
+    strncpy(username, token, sizeof(username));
+    // Parse IP address
+    token = strtok(NULL, " ");
+    if (!token) {
+        parsing_err();
+        return;
+    }
+    strncpy(ip, token, sizeof(ip));
+    // Parse password
+    token = strtok(NULL, " ");
+    if (!token) {
+        parsing_err();
+        return;
+    }
+    strncpy(pass, token, sizeof(pass));
+    // Parse permissions
+    token = strtok(NULL, " ");
+    if (token) {
+        if (strcmp(token, "yes") == 0) cs = true;
+        else if (strcmp(token, "no") == 0) cs = false;
+    } else {
+        parsing_err();
+        return;
+    }
+    token = strtok(NULL, " ");
+    if (token) {
+        if (strcmp(token, "yes") == 0) p2p = true;
+        else if (strcmp(token, "no") == 0) p2p = false;    
+    } else {
+        parsing_err();
+        return;
+    }
+    token = strtok(NULL, "\r\n\0");
+    if (token) {
+        if (strcmp(token, "yes") == 0) multicast = true;
+        else if (strcmp(token, "no") == 0) multicast = false;
+    } else {
+        parsing_err();
+        return;
+    }
+    
+    if (add_user(username, pass, ip, cs, p2p, multicast)) sndmsg("[ADD] Failed to add user\n");
+    else sndmsg("[ADD] User added\n");
 }
 
 void menu(char *opt) {
     printf("%s >> %s\n", prefix, opt);
     char buff[BUFFSIZE];
     if (strcmp(opt, "LIST") == 0) list_users();
-    else if (strncmp(opt, "ADD", 3) == 0) sndmsg("Not yet implemented!\n");
+    else if (strncmp(opt, "ADD", 3) == 0) new_user(opt);
     else if (strncmp(opt, "DEL", 3) == 0) del_user(opt);
     else if (strcmp(opt, "QUIT") == 0) {
         close(client_fd);
@@ -73,14 +132,16 @@ void accepting() {
     if (client_fd > 0) {
         serve_cli();
         close(client_fd);
+        client_fd = -1;
     }
 }
 
-void cli_setup() {
+void* cli_setup() {
     slen = sizeof(client);
     pid_t mypid = getpid();
     pid_t parent = getppid();
     printf("[Admin CLI] PID: %u | PPID: %u\n", mypid, parent);
     cli_print("TCP socket accepting connections...", NULL);
     accepting();
+    return NULL;
 }

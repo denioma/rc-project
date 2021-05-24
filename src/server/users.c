@@ -39,17 +39,18 @@ void del_user(char* opt) {
         sndmsg("[DEL] Registry is empty\n");
         return;
     }
-
+    
     strtok(opt, " ");
     char *username = strtok(NULL, "\n");
     if (!username) return;
-    printf("[DEL] Attempting to remove user %s\n", username);
+    // printf("[DEL] Attempting to remove user %s\n", username);
     user* curr, * prev;
     if (strcmp(root->username, username) == 0) {
         curr = root->next;
         free(root);
         root = curr;
         if (modified == false) modified = true;
+        sndmsg("[DEL] User deleted\n");
         return;
     }
     if (!root->next) return; 
@@ -60,6 +61,7 @@ void del_user(char* opt) {
             prev->next = curr->next;
             free(curr);
             if (modified == false) modified = true;
+            sndmsg("[DEL] User deleted\n");
             return;
         }
         if (curr->next) {
@@ -67,6 +69,7 @@ void del_user(char* opt) {
             curr = curr->next;
         } else return;
     }
+    sndmsg("[DEL] Failed to delete user\n");
 }
 
 int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast) {
