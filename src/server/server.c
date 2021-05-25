@@ -208,6 +208,7 @@ void forward(char* msg, struct sockaddr_in* addr) {
         return;   
     } puts(token);
     strncpy(payload, token, sizeof(payload));
+    snprintf(payload, sizeof(payload), "%s %s", username, token);
     printf("[DEBUG] MSG %s %s\n", username, payload);
     user* dest = findUser(username, NULL);
     if (dest && dest->msgport) {
@@ -225,14 +226,14 @@ void forward(char* msg, struct sockaddr_in* addr) {
 void peer(char* msg, struct sockaddr_in* addr) {
     strtok(msg, " ");
     char* username = strtok(NULL, "\0");
-    if (!username) {
-        // TODO Complain
-    }
+    // if (!username) {
+        // TODO check if needed
+    // }
     user* dest = findUser(username, NULL);
     char buff[BUFFSIZE];
     if (dest) {
-        snprintf(buff, sizeof(buff), "%s %d", dest->ip, dest->msgport);
-        sendto(udp_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) addr, sizeof(*addr));
+        sendto(udp_sock, dest->ip, INET_ADDRSTRLEN, 0, (struct sockaddr*) addr, sizeof(*addr));
+        sendto(udp_sock, dest->msgport, sizeof(dest->msgport), 0, (struct sockaddr*) addr, sizeof(*addr));
     }
 }
 
