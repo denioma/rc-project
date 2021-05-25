@@ -217,7 +217,7 @@ int auth(struct sockaddr_in* addr, socklen_t* slen) {
 }
 
 void cs_message() {
-    char user[AUTHSIZE], payload[BUFFSIZE-AUTHSIZE-12];
+    char user[AUTHSIZE], payload[BUFFSIZE-2*AUTHSIZE-11];
     printf("To: ");
     fgets(user, sizeof(user), stdin);
     user[strcspn(user, "\n")] = 0;
