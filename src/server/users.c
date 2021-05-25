@@ -12,22 +12,13 @@ extern void sndmsg(char *msg);
 /* ----- User List Interfaces ----- */
 
 user* findUser(char* username, char* ip) {
-    printf("[DEBUG] Matching %s\n", username);
-    if (ip == NULL) puts("[DEBUG] No IP");
     if (!uroot) return NULL;
     user* curr = uroot;
     while (curr != NULL) {
         if (strcmp(username, curr->username) == 0) {
-            puts("[DEBUG] Username match");
             if (ip == NULL || strcmp(ip, curr->ip) == 0) return curr;
-            else {
-                puts("[DEBUG] IP is not a match");
-                return NULL;
-            }
-        } else {
-            puts("[DEBUG] Username is not a match");
-            curr = curr->next;
-        }
+            else return NULL;
+        } else curr = curr->next;
     }
     return NULL;
 }

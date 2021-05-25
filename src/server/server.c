@@ -205,7 +205,6 @@ void forward(char* msg, struct sockaddr_in* addr) {
         return;   
     }
     snprintf(payload, sizeof(payload), "[%s] %s", username, token);
-    printf("[DEBUG] MSG %s %s\n", username, payload);
     user* dest = findUser(username, NULL);
     if (dest && dest->msgport) {
         char response[] = "Message sent";
