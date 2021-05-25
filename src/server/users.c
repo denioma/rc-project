@@ -42,7 +42,6 @@ user* matchUser(char *username, char* pass, char *ip) {
     else return NULL;
 }
 
-// TODO delete user
 void del_user(char* opt) {
     if (!uroot) {
         sndmsg("[DEL] Registry is empty\n");
@@ -52,7 +51,6 @@ void del_user(char* opt) {
     strtok(opt, " ");
     char *username = strtok(NULL, "\n");
     if (!username) return;
-    // printf("[DEL] Attempting to remove user %s\n", username);
     user* curr, * prev;
     if (strcmp(uroot->username, username) == 0) {
         curr = uroot->next;
@@ -141,10 +139,7 @@ group* get_group(char* name) {
 }
 
 group* new_group(char* name) {
-    if (baseIp == maxIp+1) {
-        // TODO COMPLAIN THAT YOU HAVE REACHED AN IMPOSSIBLE NUMBER OF MULTICAST GROUPS
-        return NULL;
-    }
+    if (baseIp == maxIp+1) return NULL;
     group* curr = groot;
     if (groot) {
         while (1) {

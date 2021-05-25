@@ -104,9 +104,7 @@ void menu(char *opt) {
     else if (strcmp(opt, "QUIT") == 0) {
         close(client_fd);
         accepting();
-    }
-    else if (strcmp(opt, "SHUTDOWN") == 0) kill(0, SIGINT); // FIX: Just for fun, delete later
-    else {
+    } else {
         snprintf(buff, sizeof(buff), "%s: command not found\n", opt);
         sndmsg(buff);
     }

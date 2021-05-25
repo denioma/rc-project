@@ -239,7 +239,7 @@ void peer() {
     printf("To: ");
     fgets(username, sizeof(username), stdin);
     username[strcspn(username, "\n")] = 0;
-    if (strcmp(username, " ") == 0) {
+    if (strcmp(username, "") == 0) {
         puts("Username cannot be empty");
         return;
     }
@@ -265,13 +265,20 @@ void join_group() {
     printf("Name: ");
     fgets(buff, sizeof(buff), stdin);
     buff[strcspn(buff, "\n")] = 0;
+    if (strcmp(buff, "") == 0) {
+        puts("Group name cannot be empty");
+        return;
+    }
     snprintf(msg, sizeof(msg), "GROUP %s", buff);
     unsigned long multicast_ip, recvsize;
     do {
         sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
         recvsize = recvfrom(sock, &multicast_ip, sizeof(multicast_ip), 0, NULL, NULL);
     } while (recvsize != sizeof(multicast_ip));
-    
+    if (multicast_ip == 0) {
+        puts("Server failed to get group");
+        return;
+    }
     struct ip_mreqn multiopt;
     multiopt.imr_multiaddr.s_addr = multicast_ip;
     multiopt.imr_address.s_addr = htonl(INADDR_ANY);

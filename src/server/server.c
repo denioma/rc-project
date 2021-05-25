@@ -106,8 +106,7 @@ int main(int argc, char* argv[]) {
         server_close(-1);
     } else puts("[Server] Bound UDP socket");
 
-    // TODO: Check if useful to increase backlog
-    if (listen(tcp_sock, 5) == -1) {
+    if (listen(tcp_sock, 0) == -1) {
         perror("[Server] Failed to listen on socket");
         server_close(-1);
     } else puts("[Server] Listening on TCP socket");
@@ -168,7 +167,6 @@ void auth(char* msg, struct sockaddr_in* addr) {
         puts("[AUTH] User authorized");
         int perms = find->server * 100 + find->p2p * 10 + find->multicast;
         snprintf(buff, sizeof(buff),"%d", perms);
-        // TODO Mutex this (probably a named semaphore bc it's easier to open)
         sendto(udp_sock, "SUCCESS", strlen("SUCCESS")+1, 0, (struct sockaddr*) addr, sizeof(*addr));
         sendto(udp_sock, &perms, sizeof(perms), 0,(struct sockaddr*) addr, sizeof(*addr));
     } else {
@@ -184,9 +182,8 @@ void user_bind(char *msg, struct sockaddr_in* addr) {
     char* username = strtok(NULL, " ");
     user* client = findUser(username, ip); 
     if (client) {
-        client->msg_addr = *addr; // IDEA consider deprecating this
-        client->msgport = addr->sin_port;
-        printf("[DEBUG] %d %d\n", addr->sin_port, client->msgport);
+        client->msg_addr = *addr;
+        client->msgport = &(client->msg_addr.sin_port);
         printf("[User] %s online\n", client->username);
     }
 }
@@ -207,7 +204,7 @@ void forward(char* msg, struct sockaddr_in* addr) {
         sendto(udp_sock, "0", 2, 0, (struct sockaddr*) addr, sizeof(addr));
         return;   
     }
-    snprintf(payload, sizeof(payload), "%s %s", username, token);
+    snprintf(payload, sizeof(payload), "[%s] %s", username, token);
     printf("[DEBUG] MSG %s %s\n", username, payload);
     user* dest = findUser(username, NULL);
     if (dest && dest->msgport) {
@@ -225,13 +222,10 @@ void forward(char* msg, struct sockaddr_in* addr) {
 void peer(char* msg, struct sockaddr_in* addr) {
     strtok(msg, " ");
     char* username = strtok(NULL, "\0");
-    // if (!username) {
-        // TODO check if needed
-    // }
     user* dest = findUser(username, NULL);
     if (dest) {
         sendto(udp_sock, dest->ip, INET_ADDRSTRLEN, 0, (struct sockaddr*) addr, sizeof(*addr));
-        sendto(udp_sock, &dest->msgport, sizeof(dest->msgport), 0, (struct sockaddr*) addr, sizeof(*addr));
+        sendto(udp_sock, dest->msgport, sizeof(*dest->msgport), 0, (struct sockaddr*) addr, sizeof(*addr));
     }
 }
 
@@ -239,10 +233,10 @@ void groupchat(char* msg, struct sockaddr_in* addr) {
     strtok(msg, " ");
     char* name = strtok(NULL, "\0");
     group* dest = new_group(name);
-    if (!dest) {
-        // TODO COMPLAIN
-    }
-    sendto(udp_sock, &dest->ip, sizeof(dest->ip), 0, (struct sockaddr*) addr, sizeof(*addr));
+    if (dest)
+        sendto(udp_sock, &dest->ip, sizeof(dest->ip), 0, (struct sockaddr*) addr, sizeof(*addr));
+    else
+        sendto(udp_sock, 0, sizeof(long), 0, (struct sockaddr*) addr, sizeof(*addr));
 }
 
 void disconnect(char* msg) {
@@ -250,7 +244,7 @@ void disconnect(char* msg) {
     char *username = strtok(NULL, "\0");
     user* client = findUser(username, NULL);
     if (client) {
-        client->msgport = 0;
+        client->msgport = NULL;
         memset(&client->msg_addr, 0, sizeof(client->msg_addr));
         printf("[User] %s offline\n", client->username);
     }
