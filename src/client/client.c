@@ -65,7 +65,6 @@ int main(int argc, char* argv[]) {
     iface.ifr_addr.sa_family = AF_INET;
     strncpy(iface.ifr_name, "eth0", IFNAMSIZ-1);
     ioctl(rcv_sock, SIOCGIFADDR, &iface);
-    printf("%d\n", iface.ifr_ifindex);
 
     // Override SIGINT
     struct sigaction interrupt;
@@ -125,7 +124,8 @@ int main(int argc, char* argv[]) {
     if (code == -1) perror("Failed to increase TTL");
 
     // Set outbound interface for multicast datagrams
-    struct in_addr if_addr = ((struct sockaddr_in*) &iface.ifr_addr)->sin_addr;
+    struct in_addr if_addr;
+    if_addr.s_addr = htonl(INADDR_ANY);
     code = setsockopt(sock, IPPROTO_IP, IP_MULTICAST_IF, &if_addr, sizeof(if_addr));
     if (code == -1) perror("Failed to set IP_MULTICAST_IF");
 
@@ -282,7 +282,7 @@ void group_msg() {
     
     struct ip_mreqn multiopt;
     multiopt.imr_multiaddr.s_addr = multicast_ip;
-    multiopt.imr_address = htonl(INADDR_ANY);
+    multiopt.imr_address.s_addr = htonl(INADDR_ANY);
     multiopt.imr_ifindex = 0;
     int code = setsockopt(rcv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multiopt, sizeof(multiopt));
     if (code == -1) perror("Failed to set IP_ADD_MEMBERSHIP");
