@@ -293,7 +293,7 @@ void group_msg() {
     printf("Name: ");
     fgets(group, sizeof(group), stdin);
     group[strcspn(group, "\n")] = 0;
-    puts(msg);
+    snprintf(msg, sizeof(msg), "GROUP %s", group);
     unsigned long multicast_ip, recvsize;
     do {
         sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
