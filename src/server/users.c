@@ -151,9 +151,8 @@ group* new_group(char* name) {
     group* new = malloc(sizeof(group));
     new = malloc(sizeof(group));
     strncpy(new->name, name, sizeof(new->name));
-    new->ip = htonl(baseIp);
+    new->ip = htonl(baseIp++);
     if (groot) curr->next = new;
     else groot = new;
-    baseIp++;
     return new;
 }
