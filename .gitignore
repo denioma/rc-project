@@ -56,3 +56,6 @@ TODO
 *.todo
 *.todos
 *.task
+
+# Scripts
+update.sh

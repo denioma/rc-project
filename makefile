@@ -1,7 +1,7 @@
 CC = gcc
 FLAGS = -Wall -Wextra -g -pthread
 
-all: client.app server.app admin.app
+all: client.app server.app
 
 client.app: src/client/client.c
 	${CC} ${FLAGS} $< -o $@
@@ -9,8 +9,5 @@ client.app: src/client/client.c
 server.app: src/server/server.c src/server/configcli.c src/server/users.c
 	${CC} ${FLAGS} $^ -o $@
 
-admin.app: src/client/admin.c
-	${CC} ${FLAGS} $< -o $@
-
 clean:
-	@rm -f server.app client.app admin.app
+	@rm -f server.app client.app

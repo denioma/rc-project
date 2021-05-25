@@ -10,17 +10,21 @@
 #include <unistd.h>
 #include <netdb.h>
 #include <arpa/inet.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 
 #define BUFFSIZE 512
 #define AUTHSIZE 32
+#define RCVPORT 9999
 
 typedef enum { false, true } bool;
 
-int sock, rcv_sock;
+int sock = -1, rcv_sock = -1;
 struct sockaddr_in addr;
+struct ifreq iface;
 socklen_t slen;
 bool cs, p2p, multicast;
 char username[AUTHSIZE];
@@ -32,12 +36,16 @@ void menu();
 void* incoming_msg();
 
 void close_client(int code) {
-    snprintf(buff, sizeof(buff), "BYE %s", username);
-    sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, slen);
-    close(sock);
     pthread_cancel(receiver);
     pthread_join(receiver, NULL);
-    close(rcv_sock);
+    if (sock != -1) {
+        snprintf(buff, sizeof(buff), "BYE %s", username);
+        sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, slen);
+        if (close(sock))
+            perror("Failed to close socket");
+    }
+    if (rcv_sock != -1 &&close(rcv_sock))
+        perror("Failed to close receiving socket");
     exit(code);
 }
 
@@ -50,6 +58,14 @@ int main(int argc, char* argv[]) {
         fprintf(stderr, "Usage: ./server.app <host> <port>\n");
         exit(1);
     }
+
+    int code;
+
+    // Store eth0 IP and index in iface
+    iface.ifr_addr.sa_family = AF_INET;
+    strncpy(iface.ifr_name, "eth0", IFNAMSIZ-1);
+    ioctl(rcv_sock, SIOCGIFADDR, &iface);
+    printf("%d\n", iface.ifr_ifindex);
 
     // Override SIGINT
     struct sigaction interrupt;
@@ -66,6 +82,7 @@ int main(int argc, char* argv[]) {
     struct hostent* hostPtr;
     if (!(hostPtr = gethostbyname(hostname))) {
         perror("Failed to get host");
+        
         exit(1);
     }
 
@@ -79,27 +96,53 @@ int main(int argc, char* argv[]) {
     // Create UDP socket for server opeartions
     if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
         fprintf(stderr, "Failed to open socket\n");
-        exit(1);
+        close_client(1);
     }
 
     if ((rcv_sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
         fprintf(stderr, "Failed to open socket\n");
-        exit(1);
+        close_client(1);
     }
+
+    bool reuseaddr = true;
+    code = setsockopt(rcv_sock, SOL_SOCKET, SO_REUSEADDR, &reuseaddr, sizeof(reuseaddr));
+    if (code == -1) perror("Failed to set SO_REUSEADDR");
 
     // Set timeout for receiving UDP datagrams
     struct timeval timeout;
     timeout.tv_sec = 2;
     timeout.tv_usec = 0;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    
     // Do not loopback multicast datagrams
     bool loop = false;
-    setsockopt(sock, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
+    code = setsockopt(sock, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
+    if (code == -1) perror("Failed to set IP_MULTICAST_LOOP");
+
+    // Increase Multicast TTL
+    int multicastTTL = 255;
+    code = setsockopt(sock, IPPROTO_IP, IP_MULTICAST_TTL, &multicastTTL, sizeof(multicastTTL));
+    if (code == -1) perror("Failed to increase TTL");
+
+    // Set outbound interface for multicast datagrams
+    struct in_addr if_addr = ((struct sockaddr_in*) &iface.ifr_addr)->sin_addr;
+    code = setsockopt(sock, IPPROTO_IP, IP_MULTICAST_IF, &if_addr, sizeof(if_addr));
+    if (code == -1) perror("Failed to set IP_MULTICAST_IF");
 
     // Set socket to only receive datagrams from server
     if (connect(sock, (struct sockaddr*)&addr, slen) < 0) {
         fprintf(stderr, "Failed to connect to server\n");
-        exit(1);
+        close_client(1);
+    }
+
+    // Bind receiving socket to local port
+    struct sockaddr_in rcvaddr;
+    rcvaddr.sin_family = AF_INET;
+    rcvaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    rcvaddr.sin_port = htons(RCVPORT);
+    if (bind(rcv_sock, (struct sockaddr*) &rcvaddr, sizeof(rcvaddr))) {
+        fprintf(stderr, "Failed to bind receiving socket to local port");
+        close_client(1);
     }
 
     // Request user authentication
@@ -112,8 +155,7 @@ int main(int argc, char* argv[]) {
     }
     if (attempts == 3) {
         puts("Failed authentication too many times");
-        close(sock);
-        exit(1);
+        close_client(1);
     }
 
     pthread_create(&receiver, NULL, incoming_msg, NULL);
@@ -123,8 +165,7 @@ int main(int argc, char* argv[]) {
     printf("C-S: %d | P2P: %d | Multicast: %d\n", cs, p2p, multicast);
     while (1) menu();
 
-    puts("Exiting");
-    close(sock);
+    close_client(1);
 
     return 0;
 }
@@ -133,8 +174,8 @@ void* incoming_msg() {
     struct sockaddr_in rcvaddr;
     socklen_t addrlen;
     char buff[BUFFSIZE], ip[INET_ADDRSTRLEN];
+    unsigned short int port;
     int recvlen;
-    short int port;
     while (1) {
         memset(&rcvaddr, 0, sizeof(rcvaddr));
         recvlen = recvfrom(rcv_sock, buff, sizeof(buff), 0, (struct sockaddr*) &rcvaddr, &addrlen);
@@ -238,20 +279,23 @@ void group_msg() {
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &multicast_ip, ip, sizeof(ip));
     printf("Multicast IP: %s\n", ip);
+    
     struct ip_mreqn multiopt;
     multiopt.imr_multiaddr.s_addr = multicast_ip;
-    multiopt.imr_address.s_addr = htonl(INADDR_ANY);
+    multiopt.imr_address = htonl(INADDR_ANY);
     multiopt.imr_ifindex = 0;
+    int code = setsockopt(rcv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multiopt, sizeof(multiopt));
+    if (code == -1) perror("Failed to set IP_ADD_MEMBERSHIP");
+    
     struct sockaddr_in multiaddr;
     multiaddr.sin_family = AF_INET;
     multiaddr.sin_addr.s_addr = multicast_ip;
-    multiaddr.sin_port = htons(9999);
-    setsockopt(sock, IPPROTO_IP, IP_MULTICAST_IF, &multiopt, sizeof(multiopt));
-    setsockopt(rcv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multiopt, sizeof(multiopt));
+    multiaddr.sin_port = htons(RCVPORT);
+    
     printf("Message: ");
     fgets(msg, sizeof(msg), stdin);
     msg[strcspn(msg, "\n")] = 0;
-    sendto(sock, msg, sizeof(msg), 0, &multiaddr, sizeof(multiaddr));
+    sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &multiaddr, sizeof(multiaddr));
 }
 
 void menu() {
