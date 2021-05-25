@@ -229,10 +229,9 @@ void peer(char* msg, struct sockaddr_in* addr) {
         // TODO check if needed
     // }
     user* dest = findUser(username, NULL);
-    char buff[BUFFSIZE];
     if (dest) {
         sendto(udp_sock, dest->ip, INET_ADDRSTRLEN, 0, (struct sockaddr*) addr, sizeof(*addr));
-        sendto(udp_sock, dest->msgport, sizeof(dest->msgport), 0, (struct sockaddr*) addr, sizeof(*addr));
+        sendto(udp_sock, &dest->msgport, sizeof(dest->msgport), 0, (struct sockaddr*) addr, sizeof(*addr));
     }
 }
 

@@ -235,10 +235,14 @@ void cs_message() {
 }
 
 void peer() {
-    char username[AUTHSIZE], buff[BUFFSIZE], response[BUFFSIZE];
+    char username[AUTHSIZE], buff[BUFFSIZE];
     printf("To: ");
     fgets(username, sizeof(username), stdin);
     username[strcspn(username, "\n")] = 0;
+    if (strcmp(username, " ") == 0) {
+        puts("Username cannot be empty");
+        return;
+    }
     snprintf(buff, sizeof(buff), "PEER %s", username);
     int rec1, rec2;
     char ip[INET_ADDRSTRLEN];
@@ -324,6 +328,7 @@ void menu() {
     case 3:
         if (multicast) join_group();
         else puts("Permission denied\n");
+        break;
     case 4:
         if (multicast) group_msg();
         else puts("Permission denied\n");
