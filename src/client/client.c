@@ -289,14 +289,14 @@ void join_group() {
 }
 
 void group_msg() {
-    char buff[AUTHSIZE], msg[BUFFSIZE];
+    char group[AUTHSIZE], buff[BUFFSIZE-AUTHSIZE-4], msg[BUFFSIZE];
     printf("Name: ");
-    fgets(buff, sizeof(buff), stdin);
-    buff[strcspn(buff, "\n")] = 0;
-    snprintf(msg, sizeof(msg), "GROUP %s", buff);
+    fgets(group, sizeof(group), stdin);
+    group[strcspn(group, "\n")] = 0;
+    snprintf(msg, sizeof(msg), "GROUP %s", group);
     unsigned long multicast_ip, recvsize;
     do {
-        sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
+        sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, slen);
         recvsize = recvfrom(sock, &multicast_ip, sizeof(multicast_ip), 0, NULL, NULL);
     } while (recvsize != sizeof(multicast_ip));
     
@@ -306,9 +306,10 @@ void group_msg() {
     multiaddr.sin_port = htons(RCVPORT);
     
     printf("Message: ");
-    fgets(msg, sizeof(msg), stdin);
-    msg[strcspn(msg, "\n")] = 0;
-    sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &multiaddr, sizeof(multiaddr));
+    fgets(buff, sizeof(buff), stdin);
+    buff[strcspn(buff, "\n")] = 0;
+    snprintf(msg, sizeof(msg), "[%s] %s", username, buff);
+    sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &multiaddr, sizeof(multiaddr));
 }
 
 void menu() {
