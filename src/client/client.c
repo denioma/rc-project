@@ -235,7 +235,7 @@ void cs_message() {
 }
 
 void peer() {
-    char username[AUTHSIZE], buff[BUFFSIZE];
+    char username[AUTHSIZE], buff[BUFFSIZE-AUTHSIZE-4], msg[BUFFSIZE];
     printf("To: ");
     fgets(username, sizeof(username), stdin);
     username[strcspn(username, "\n")] = 0;
@@ -257,7 +257,8 @@ void peer() {
     printf("Message: ");
     fgets(buff, sizeof(buff), stdin);
     buff[strcspn(buff, "\n")] = 0;
-    sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &peer_addr, sizeof(peer_addr));
+    snprintf(msg, sizeof(msg), "[%s] %s", username, buff);
+    sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &peer_addr, sizeof(peer_addr));
 }
 
 void join_group() {
