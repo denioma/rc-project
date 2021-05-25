@@ -225,7 +225,7 @@ void cs_message() {
     fgets(payload, sizeof(payload), stdin);
     payload[strcspn(payload, "\n")] = 0;
     char msg[BUFFSIZE];
-    snprintf(msg, sizeof(msg), "MSG %s [%s] %s", username, user, payload);
+    snprintf(msg, sizeof(msg), "MSG %s [%s] %s", user, username, payload);
     int recvsize;
     do {
         sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
