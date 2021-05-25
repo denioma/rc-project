@@ -323,8 +323,8 @@ void menu() {
     int opt;
     do {
         scanf("%d", &opt);
-    } while (opt < 1 || opt > 4);
-    getchar();
+    } while (opt < 1 || opt > 5);
+    getchar(); // Clear stdin after scanf
     switch (opt) {
     case 1:
         if (cs) cs_message();
