@@ -1,3 +1,7 @@
+// Redes de Comunicação 2020/2021 - Projeto Final
+// Rodrigo Alexandre da Mota Machado - 2019218299
+// Rui Bernardo Lopes Rodrigues - 2019217573
+
 #include <netdb.h>
 #include <pthread.h>
 #include <signal.h>

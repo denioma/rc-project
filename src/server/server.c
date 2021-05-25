@@ -1,3 +1,7 @@
+// Redes de Comunicação 2020/2021 - Projeto Final
+// Rodrigo Alexandre da Mota Machado - 2019218299
+// Rui Bernardo Lopes Rodrigues - 2019217573
+
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -13,7 +17,6 @@
 
 void load_users(char* file);
 int save_users(char* file);
-void free_users(user* node);
 
 int tcp_sock, udp_sock;
 extern int client_fd;
@@ -40,7 +43,7 @@ void server_close(int signum) {
         puts("[Server] Changes made to users");
         save_users(registry_file);
     }
-    free_users(root);
+    free_users(uroot);
     puts("\n[Server] Server closed");
     if (signum == SIGINT || signum == 0) exit(0);
     else exit(1);
@@ -64,7 +67,7 @@ int main(int argc, char* argv[]) {
     const int config_port = atoi(*(argv + 2));
     registry_file = *(argv + 3);
 
-    root = NULL;
+    uroot = NULL;
     load_users(registry_file);
     modified = false;
 
@@ -148,7 +151,7 @@ void udp_listen() {
 
 /* ----- Serving clientes (Threaded) ----- */
 
-void auth_threaded(char* msg, struct sockaddr_in* addr) {
+void auth(char* msg, struct sockaddr_in* addr) {
     char username[ENTRYSIZE], pass[ENTRYSIZE];
     strtok(msg, " ");
     char *token = strtok(NULL, " ");
@@ -174,7 +177,7 @@ void auth_threaded(char* msg, struct sockaddr_in* addr) {
     }
 }
 
-void bind_threaded(char *msg, struct sockaddr_in* addr) {
+void user_bind(char *msg, struct sockaddr_in* addr) {
     char ip[INET_ADDRSTRLEN];
     inet_ntop(AF_INET, &addr->sin_addr, ip, sizeof(ip));
     strtok(msg, " ");
@@ -188,7 +191,7 @@ void bind_threaded(char *msg, struct sockaddr_in* addr) {
     }
 }
 
-void forward_threaded(char* msg, struct sockaddr_in* addr) {
+void forward(char* msg, struct sockaddr_in* addr) {
     char username[ENTRYSIZE], payload[BUFFSIZE], * token;
     strtok(msg, " ");
     token = strtok(NULL, " ");
@@ -219,7 +222,7 @@ void forward_threaded(char* msg, struct sockaddr_in* addr) {
     }
 }
 
-void peer_threaded(char* msg, struct sockaddr_in* addr) {
+void peer(char* msg, struct sockaddr_in* addr) {
     strtok(msg, " ");
     char* username = strtok(NULL, "\0");
     if (!username) {
@@ -231,6 +234,16 @@ void peer_threaded(char* msg, struct sockaddr_in* addr) {
         snprintf(buff, sizeof(buff), "%s %d", dest->ip, dest->msgport);
         sendto(udp_sock, buff, strlen(buff)+1, 0, (struct sockaddr*) addr, sizeof(*addr));
     }
+}
+
+void groupchat(char* msg, struct sockaddr_in* addr) {
+    strtok(msg, " ");
+    char* name = strtok(NULL, "\0");
+    group* dest = new_group(name);
+    if (!dest) {
+        // TODO COMPLAIN
+    }
+    sendto(udp_sock, &dest->ip, sizeof(dest->ip), 0, (struct sockaddr*) addr, sizeof(*addr));
 }
 
 void disconnect(char* msg) {
@@ -252,10 +265,11 @@ void* serve_threaded(void *v_args) {
     inet_ntop(AF_INET, &(addr->sin_addr), ip, sizeof(ip));
     unsigned short int port = ntohs(addr->sin_port);
     printf("[%s:%d] %s\n", ip, port, msg);
-    if (strncmp(msg, "AUTH", 4) == 0) auth_threaded(msg, addr);
-    else if (strncmp(msg, "BIND", 4) == 0) bind_threaded(msg, addr);
-    else if (strncmp(msg, "MSG", 3) == 0) forward_threaded(msg, addr);
-    else if (strncmp(msg, "PEER", 4) == 0) peer_threaded(msg, addr);
+    if (strncmp(msg, "AUTH", 4) == 0) auth(msg, addr);
+    else if (strncmp(msg, "BIND", 4) == 0) user_bind(msg, addr);
+    else if (strncmp(msg, "MSG", 3) == 0) forward(msg, addr);
+    else if (strncmp(msg, "PEER", 4) == 0) peer(msg, addr);
+    else if (strncmp(msg, "GROUP", 5) == 0) groupchat(msg, addr);
     else if (strncmp(msg, "BYE", 3) == 0) disconnect(msg);
     else puts("What?");
     free(v_args);
@@ -328,8 +342,8 @@ void load_users(char* file) {
 }
 
 void dump(FILE* stream) {
-    if (!root) return;
-    user* curr = root;
+    if (!uroot) return;
+    user* curr = uroot;
     char yes[] = "yes", no[] = "no";
     char* cs, * p2p, * multicast;
     while (1) {
@@ -356,10 +370,4 @@ int save_users(char* file) {
     dump(registry);
     fclose(registry);
     return 0;
-}
-
-void free_users(user* node) {
-    if (!node) return;
-    if (node->next) free_users(node->next);
-    free(node);
 }

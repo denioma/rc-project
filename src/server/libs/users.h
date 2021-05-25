@@ -1,3 +1,7 @@
+// Redes de Comunicação 2020/2021 - Projeto Final
+// Rodrigo Alexandre da Mota Machado - 2019218299
+// Rui Bernardo Lopes Rodrigues - 2019217573
+
 #include <netdb.h>
 
 #ifndef INET_ADDRSTRLEN
@@ -6,6 +10,7 @@
 
 #define ENTRYSIZE 256
 #define BUFFSIZE 1024
+#define MULTIP "224.0.0.1"
 
 typedef enum { false, true } bool;
 
@@ -19,12 +24,27 @@ typedef struct user_struct {
     struct user_struct* next;
 } user;
 
-user* root;
+user* uroot;
 bool modified;
 char* registry_file;
 
 user* findUser(char* username, char* ip);
 user* matchUser(char *username, char* pass, char *ip);
-void list_users();
 int add_user(char* username, char* pass, char* ip, bool server, bool p2p, bool multicast);
+void list_users();
+void free_users(user* node);
+
+typedef struct group_struct {
+    char name[ENTRYSIZE];
+    unsigned long ip;
+    struct group_struct* next;
+} group;
+
+group* groot;
+unsigned long baseIp = 0xE0000001;
+const unsigned long maxIp = 0xEFFFFFFF;
+unsigned long reverse(unsigned long bytes);
+
 void del_user(char* opt);
+void get_group(char* name);
+group* new_group(char* name);
