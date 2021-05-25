@@ -232,7 +232,6 @@ void cs_message() {
         recvsize = recvfrom(sock, buff, sizeof(buff), 0, NULL, NULL);
         if (recvsize >= 0) puts(buff);
     } while (recvsize == -1);
-    // TODO maybe do something with the server response?
 }
 
 void peer() {

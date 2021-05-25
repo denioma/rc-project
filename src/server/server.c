@@ -199,15 +199,14 @@ void forward(char* msg, struct sockaddr_in* addr) {
         puts("[MSG] Incomplete");
         sendto(udp_sock, "0", 2, 0, (struct sockaddr*) addr, sizeof(addr));
         return;   
-    } puts(token);
+    }
     strncpy(username, token, sizeof(username));
     token = strtok(NULL, "\0");
     if (!token) {
         puts("[MSG] Incomplete");
         sendto(udp_sock, "0", 2, 0, (struct sockaddr*) addr, sizeof(addr));
         return;   
-    } puts(token);
-    strncpy(payload, token, sizeof(payload));
+    }
     snprintf(payload, sizeof(payload), "%s %s", username, token);
     printf("[DEBUG] MSG %s %s\n", username, payload);
     user* dest = findUser(username, NULL);
