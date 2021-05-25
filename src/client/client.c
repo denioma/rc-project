@@ -285,7 +285,7 @@ void join_group() {
     multiopt.imr_address.s_addr = htonl(INADDR_ANY);
     multiopt.imr_ifindex = 0;
     int code = setsockopt(rcv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multiopt, sizeof(multiopt));
-    if (code == -1) perror("Failed to set IP_ADD_MEMBERSHIP");
+    if (code == -1) perror("Failed to join multicast group");
 }
 
 void group_msg() {
