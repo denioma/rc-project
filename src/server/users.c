@@ -9,9 +9,6 @@
 
 extern void sndmsg(char *msg);
 
-unsigned long baseIp= 0xE0000001;
-const unsigned long maxIp = 0xEFFFFFFF;
-
 /* ----- User List Interfaces ----- */
 
 user* findUser(char* username, char* ip) {
@@ -131,6 +128,9 @@ void free_users(user* node) {
 
 /* ----- Multicast Groups Interfaces ----- */
 
+unsigned long baseIp = 0xEF000000;
+const unsigned long maxIp = 0xEFFFFFFF;
+
 group* get_group(char* name) {
     group* curr = groot;
     while (curr) {
@@ -156,9 +156,8 @@ group* new_group(char* name) {
     group* new = malloc(sizeof(group));
     new = malloc(sizeof(group));
     strncpy(new->name, name, sizeof(new->name));
-    new->ip = htonl(baseIp);
+    new->ip = htonl(baseIp++);
     if (groot) curr->next = new;
     else groot = new;
-    baseIp++;
     return new;
 }
