@@ -114,7 +114,7 @@ void list_users() {
     user *curr = uroot;
     while (1) {
         snprintf(buff, sizeof(buff), "User: %s | IP: %s | Port: %d | Pass: %s | C-S: %d | P2P: %d | Multicast: %d\n", 
-                curr->username, curr->ip, curr->msgport, curr->pass, curr->server, curr->p2p, curr->multicast);
+                curr->username, curr->ip, *curr->msgport, curr->pass, curr->server, curr->p2p, curr->multicast);
         sndmsg(buff);
         if (curr->next) curr = curr->next;
         else break;
