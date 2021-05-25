@@ -41,10 +41,9 @@ typedef struct group_struct {
 } group;
 
 group* groot;
-unsigned long baseIp = 0xE0000001;
-const unsigned long maxIp = 0xEFFFFFFF;
-unsigned long reverse(unsigned long bytes);
+unsigned long baseIp;
+const unsigned long maxIp;
 
 void del_user(char* opt);
-void get_group(char* name);
+group* get_group(char* name);
 group* new_group(char* name);

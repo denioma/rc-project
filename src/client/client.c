@@ -92,6 +92,9 @@ int main(int argc, char* argv[]) {
     timeout.tv_sec = 2;
     timeout.tv_usec = 0;
     setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout));
+    // Do not loopback multicast datagrams
+    bool loop = false;
+    setsockopt(sock, IPPROTO_IP, IP_MULTICAST_LOOP, &loop, sizeof(loop));
 
     // Set socket to only receive datagrams from server
     if (connect(sock, (struct sockaddr*)&addr, slen) < 0) {
@@ -221,6 +224,36 @@ void peer() {
     sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &peer_addr, sizeof(peer_addr));
 }
 
+void group_msg() {
+    char buff[AUTHSIZE], msg[BUFFSIZE];
+    printf("Name: ");
+    fgets(buff, sizeof(buff), stdin);
+    buff[strcspn(buff, "\n")] = 0;
+    snprintf(msg, sizeof(msg), "GROUP %s", buff);
+    unsigned long multicast_ip, recvsize;
+    do {
+        sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
+        recvsize = recvfrom(sock, &multicast_ip, sizeof(multicast_ip), 0, NULL, NULL);
+    } while (recvsize != sizeof(multicast_ip));
+    char ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &multicast_ip, ip, sizeof(ip));
+    printf("Multicast IP: %s\n", ip);
+    struct ip_mreqn multiopt;
+    multiopt.imr_multiaddr.s_addr = multicast_ip;
+    multiopt.imr_address.s_addr = htonl(INADDR_ANY);
+    multiopt.imr_ifindex = 0;
+    struct sockaddr_in multiaddr;
+    multiaddr.sin_family = AF_INET;
+    multiaddr.sin_addr.s_addr = multicast_ip;
+    multiaddr.sin_port = htons(9999);
+    setsockopt(sock, IPPROTO_IP, IP_MULTICAST_IF, &multiopt, sizeof(multiopt));
+    setsockopt(rcv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multiopt, sizeof(multiopt));
+    printf("Message: ");
+    fgets(msg, sizeof(msg), stdin);
+    msg[strcspn(msg, "\n")] = 0;
+    sendto(sock, msg, sizeof(msg), 0, &multiaddr, sizeof(multiaddr));
+}
+
 void menu() {
     puts("1 - Send a message via server");
     puts("2 - Send a message via P2P");
@@ -243,7 +276,7 @@ void menu() {
         else puts("You don't got permission fuckwad\n"); // TODO Substituir isto antes da entrega
         break;
     case 3:
-        if (multicast) puts("Imagine this also works\n");
+        if (multicast) group_msg();
         else puts("You don't got permission fuckwad\n"); // TODO Substituir isto antes da entrega
         break;
     case 4:
