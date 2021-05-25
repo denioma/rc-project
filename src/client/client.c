@@ -217,7 +217,7 @@ int auth(struct sockaddr_in* addr, socklen_t* slen) {
 }
 
 void cs_message() {
-    char user[AUTHSIZE], payload[BUFFSIZE-AUTHSIZE-5];
+    char user[AUTHSIZE], payload[BUFFSIZE-AUTHSIZE-12];
     printf("To: ");
     fgets(user, sizeof(user), stdin);
     user[strcspn(user, "\n")] = 0;
@@ -225,7 +225,7 @@ void cs_message() {
     fgets(payload, sizeof(payload), stdin);
     payload[strcspn(payload, "\n")] = 0;
     char msg[BUFFSIZE];
-    snprintf(msg, sizeof(msg), "MSG %s %s", user, payload);
+    snprintf(msg, sizeof(msg), "MSG %s [%s] %s", username, user, payload);
     int recvsize;
     do {
         sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
@@ -235,15 +235,15 @@ void cs_message() {
 }
 
 void peer() {
-    char username[AUTHSIZE], buff[BUFFSIZE-AUTHSIZE-4], msg[BUFFSIZE];
+    char user[AUTHSIZE], buff[BUFFSIZE-AUTHSIZE-4], msg[BUFFSIZE];
     printf("To: ");
-    fgets(username, sizeof(username), stdin);
-    username[strcspn(username, "\n")] = 0;
-    if (strcmp(username, "") == 0) {
+    fgets(user, sizeof(user), stdin);
+    user[strcspn(user, "\n")] = 0;
+    if (strcmp(user, "") == 0) {
         puts("Username cannot be empty");
         return;
     }
-    snprintf(buff, sizeof(buff), "PEER %s", username);
+    snprintf(buff, sizeof(buff), "PEER %s", user);
     int rec1, rec2;
     char ip[INET_ADDRSTRLEN];
     struct sockaddr_in peer_addr;

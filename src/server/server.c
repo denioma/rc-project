@@ -204,7 +204,7 @@ void forward(char* msg, struct sockaddr_in* addr) {
         sendto(udp_sock, "0", 2, 0, (struct sockaddr*) addr, sizeof(addr));
         return;   
     }
-    snprintf(payload, sizeof(payload), "[%s] %s", username, token);
+    strncpy(payload, token, sizeof(payload));
     user* dest = findUser(username, NULL);
     if (dest && dest->msgport) {
         char response[] = "Message sent";
