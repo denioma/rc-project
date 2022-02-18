@@ -20,7 +20,7 @@ typedef struct user_struct {
     char ip[INET_ADDRSTRLEN];
     bool server, p2p, multicast;
     struct sockaddr_in msg_addr;
-    unsigned short int msgport;
+    unsigned short int* msgport;
     struct user_struct* next;
 } user;
 

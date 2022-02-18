@@ -9,28 +9,16 @@
 
 extern void sndmsg(char *msg);
 
-unsigned long baseIp= 0xE0000001;
-const unsigned long maxIp = 0xEFFFFFFF;
-
 /* ----- User List Interfaces ----- */
 
 user* findUser(char* username, char* ip) {
-    printf("[DEBUG] Matching %s\n", username);
-    if (ip == NULL) puts("[DEBUG] No IP");
     if (!uroot) return NULL;
     user* curr = uroot;
     while (curr != NULL) {
         if (strcmp(username, curr->username) == 0) {
-            puts("[DEBUG] Username match");
             if (ip == NULL || strcmp(ip, curr->ip) == 0) return curr;
-            else {
-                puts("[DEBUG] IP is not a match");
-                return NULL;
-            }
-        } else {
-            puts("[DEBUG] Username is not a match");
-            curr = curr->next;
-        }
+            else return NULL;
+        } else curr = curr->next;
     }
     return NULL;
 }
@@ -42,7 +30,6 @@ user* matchUser(char *username, char* pass, char *ip) {
     else return NULL;
 }
 
-// TODO delete user
 void del_user(char* opt) {
     if (!uroot) {
         sndmsg("[DEL] Registry is empty\n");
@@ -52,7 +39,6 @@ void del_user(char* opt) {
     strtok(opt, " ");
     char *username = strtok(NULL, "\n");
     if (!username) return;
-    // printf("[DEL] Attempting to remove user %s\n", username);
     user* curr, * prev;
     if (strcmp(uroot->username, username) == 0) {
         curr = uroot->next;
@@ -116,7 +102,7 @@ void list_users() {
     user *curr = uroot;
     while (1) {
         snprintf(buff, sizeof(buff), "User: %s | IP: %s | Port: %d | Pass: %s | C-S: %d | P2P: %d | Multicast: %d\n", 
-                curr->username, curr->ip, curr->msgport, curr->pass, curr->server, curr->p2p, curr->multicast);
+                curr->username, curr->ip, *curr->msgport, curr->pass, curr->server, curr->p2p, curr->multicast);
         sndmsg(buff);
         if (curr->next) curr = curr->next;
         else break;
@@ -131,6 +117,9 @@ void free_users(user* node) {
 
 /* ----- Multicast Groups Interfaces ----- */
 
+unsigned long baseIp = 0xEF000000;
+const unsigned long maxIp = 0xEFFFFFFF;
+
 group* get_group(char* name) {
     group* curr = groot;
     while (curr) {
@@ -141,10 +130,7 @@ group* get_group(char* name) {
 }
 
 group* new_group(char* name) {
-    if (baseIp == maxIp+1) {
-        // TODO COMPLAIN THAT YOU HAVE REACHED AN IMPOSSIBLE NUMBER OF MULTICAST GROUPS
-        return NULL;
-    }
+    if (baseIp == maxIp+1) return NULL;
     group* curr = groot;
     if (groot) {
         while (1) {
@@ -156,9 +142,8 @@ group* new_group(char* name) {
     group* new = malloc(sizeof(group));
     new = malloc(sizeof(group));
     strncpy(new->name, name, sizeof(new->name));
-    new->ip = htonl(baseIp);
+    new->ip = htonl(baseIp++);
     if (groot) curr->next = new;
     else groot = new;
-    baseIp++;
     return new;
 }

@@ -182,7 +182,7 @@ void* incoming_msg() {
         buff[recvlen] = 0;
         inet_ntop(AF_INET, &(rcvaddr.sin_addr), ip, sizeof(ip));
         port = ntohs(rcvaddr.sin_port);
-        printf("Received from %s:%d >> %s\n", ip, port, buff);
+        printf("%s:%d >> %s\n", ip, port, buff);
     }
 }
 
@@ -217,7 +217,7 @@ int auth(struct sockaddr_in* addr, socklen_t* slen) {
 }
 
 void cs_message() {
-    char user[AUTHSIZE], payload[BUFFSIZE-AUTHSIZE-5];
+    char user[AUTHSIZE], payload[BUFFSIZE-2*AUTHSIZE-11];
     printf("To: ");
     fgets(user, sizeof(user), stdin);
     user[strcspn(user, "\n")] = 0;
@@ -225,67 +225,80 @@ void cs_message() {
     fgets(payload, sizeof(payload), stdin);
     payload[strcspn(payload, "\n")] = 0;
     char msg[BUFFSIZE];
-    snprintf(msg, sizeof(msg), "MSG %s %s", user, payload);
+    snprintf(msg, sizeof(msg), "MSG %s [%s] %s", user, username, payload);
     int recvsize;
     do {
         sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
         recvsize = recvfrom(sock, buff, sizeof(buff), 0, NULL, NULL);
         if (recvsize >= 0) puts(buff);
     } while (recvsize == -1);
-    // TODO maybe do something with the server response?
 }
 
 void peer() {
-    char username[AUTHSIZE], buff[BUFFSIZE], response[BUFFSIZE];
+    char user[AUTHSIZE], buff[BUFFSIZE-AUTHSIZE-4], msg[BUFFSIZE];
     printf("To: ");
-    fgets(username, sizeof(username), stdin);
-    username[strcspn(username, "\n")] = 0;
-    snprintf(buff, sizeof(buff), "PEER %s", username);
-    int recvsize;
+    fgets(user, sizeof(user), stdin);
+    user[strcspn(user, "\n")] = 0;
+    if (strcmp(user, "") == 0) {
+        puts("Username cannot be empty");
+        return;
+    }
+    snprintf(buff, sizeof(buff), "PEER %s", user);
+    int rec1, rec2;
+    char ip[INET_ADDRSTRLEN];
+    struct sockaddr_in peer_addr;
+    peer_addr.sin_family = AF_INET;
     do {
         sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &addr, slen);
-        recvsize = recvfrom(sock, response, sizeof(response), 0, NULL, NULL);
-    } while (recvsize == -1);
-    response[recvsize] = 0;
-    struct sockaddr_in peer_addr;
-    char* token = strtok(response, " ");
-    if (!token) { 
-        // TODO Complain
-    } 
-    inet_pton(AF_INET, token, &peer_addr.sin_addr.s_addr);
-    token = strtok(NULL, "\0");
-    if (!token) {
-        // TODO Complain
-    }
-    peer_addr.sin_family = AF_INET;
-    peer_addr.sin_port = atoi(token);
+        rec1 = recvfrom(sock, ip, sizeof(ip), 0, NULL, NULL);
+        rec2 = recvfrom(sock, &peer_addr.sin_port, sizeof(peer_addr.sin_port), 0, NULL, NULL);
+    } while (rec1 != sizeof(ip) || rec2 != sizeof(peer_addr.sin_port));
+    inet_pton(AF_INET, ip, &peer_addr.sin_addr.s_addr);
     printf("Message: ");
     fgets(buff, sizeof(buff), stdin);
     buff[strcspn(buff, "\n")] = 0;
-    sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &peer_addr, sizeof(peer_addr));
+    snprintf(msg, sizeof(msg), "[%s] %s", username, buff);
+    sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &peer_addr, sizeof(peer_addr));
 }
 
-void group_msg() {
+void join_group() {
     char buff[AUTHSIZE], msg[BUFFSIZE];
     printf("Name: ");
     fgets(buff, sizeof(buff), stdin);
     buff[strcspn(buff, "\n")] = 0;
+    if (strcmp(buff, "") == 0) {
+        puts("Group name cannot be empty");
+        return;
+    }
     snprintf(msg, sizeof(msg), "GROUP %s", buff);
     unsigned long multicast_ip, recvsize;
     do {
         sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
         recvsize = recvfrom(sock, &multicast_ip, sizeof(multicast_ip), 0, NULL, NULL);
     } while (recvsize != sizeof(multicast_ip));
-    char ip[INET_ADDRSTRLEN];
-    inet_ntop(AF_INET, &multicast_ip, ip, sizeof(ip));
-    printf("Multicast IP: %s\n", ip);
-    
+    if (multicast_ip == 0) {
+        puts("Server failed to get group");
+        return;
+    }
     struct ip_mreqn multiopt;
     multiopt.imr_multiaddr.s_addr = multicast_ip;
     multiopt.imr_address.s_addr = htonl(INADDR_ANY);
     multiopt.imr_ifindex = 0;
     int code = setsockopt(rcv_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &multiopt, sizeof(multiopt));
-    if (code == -1) perror("Failed to set IP_ADD_MEMBERSHIP");
+    if (code == -1) perror("Failed to join multicast group");
+}
+
+void group_msg() {
+    char group[AUTHSIZE], buff[BUFFSIZE-AUTHSIZE-4], msg[BUFFSIZE];
+    printf("Name: ");
+    fgets(group, sizeof(group), stdin);
+    group[strcspn(group, "\n")] = 0;
+    snprintf(msg, sizeof(msg), "GROUP %s", group);
+    unsigned long multicast_ip, recvsize;
+    do {
+        sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &addr, slen);
+        recvsize = recvfrom(sock, &multicast_ip, sizeof(multicast_ip), 0, NULL, NULL);
+    } while (recvsize != sizeof(multicast_ip));
     
     struct sockaddr_in multiaddr;
     multiaddr.sin_family = AF_INET;
@@ -293,37 +306,43 @@ void group_msg() {
     multiaddr.sin_port = htons(RCVPORT);
     
     printf("Message: ");
-    fgets(msg, sizeof(msg), stdin);
-    msg[strcspn(msg, "\n")] = 0;
-    sendto(sock, msg, strlen(msg)+1, 0, (struct sockaddr*) &multiaddr, sizeof(multiaddr));
+    fgets(buff, sizeof(buff), stdin);
+    buff[strcspn(buff, "\n")] = 0;
+    snprintf(msg, sizeof(msg), "[%s] %s", username, buff);
+    sendto(sock, buff, strlen(buff)+1, 0, (struct sockaddr*) &multiaddr, sizeof(multiaddr));
 }
 
 void menu() {
     puts("1 - Send a message via server");
     puts("2 - Send a message via P2P");
-    puts("3 - Send a group message");
-    puts("4 - Quit");
+    puts("3 - Join a multicast group");
+    puts("4 - Send a group message");
+    puts("5 - Quit");
 
     printf(">> ");
     int opt;
     do {
         scanf("%d", &opt);
-    } while (opt < 1 || opt > 4);
-    getchar();
+    } while (opt < 1 || opt > 5);
+    getchar(); // Clear stdin after scanf
     switch (opt) {
     case 1:
         if (cs) cs_message();
-        else puts("You don't got permission fuckwad\n"); // TODO Substituir isto antes da entrega
+        else puts("Permission denied\n");
         break;
     case 2:
         if (p2p) peer();
-        else puts("You don't got permission fuckwad\n"); // TODO Substituir isto antes da entrega
+        else puts("Permission denied\n");
         break;
     case 3:
-        if (multicast) group_msg();
-        else puts("You don't got permission fuckwad\n"); // TODO Substituir isto antes da entrega
+        if (multicast) join_group();
+        else puts("Permission denied\n");
         break;
     case 4:
+        if (multicast) group_msg();
+        else puts("Permission denied\n");
+        break;
+    case 5:
         close_client(0);
         break;
     }
